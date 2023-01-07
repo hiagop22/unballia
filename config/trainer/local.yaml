@@ -1,0 +1,3 @@
+defaults:
+  - aws
+max_epochs: 25000

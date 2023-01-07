@@ -1,0 +1,26 @@
+defaults:
+  - _self_
+  - optimizer: adam
+  - scheduler: ReduceLROnPlateau
+  - trainer: local
+  - model: default
+  - env: PythonSimulator
+  - replaybuffer: default
+  - strategy: a2c
+  - dataset: default
+  - dataloader: default
+  - watch_metric: default
+  - onnx: default
+  - agent: a2c
+  - test: default
+  - process_state: relative_full_info
+  - noise: gaussian
+
+action_size: 2
+project_name: reinforcement_learning
+task_name: continuous_a2c_strategy
+seed: 747
+upload_onnx_sync: 10
+pre_trained: False
+pre_trained_id: 4c137e1dd96144588cda4e90a2299b1d
+logdir: ./outputs

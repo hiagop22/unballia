@@ -1,0 +1,7 @@
+actor:
+  watch_metric: actor_loss
+  watch_metric_mode: min
+  
+critic:
+  watch_metric: critic_loss
+  watch_metric_mode: min

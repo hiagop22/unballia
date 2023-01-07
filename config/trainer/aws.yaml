@@ -1,0 +1,10 @@
+_target_: pytorch_lightning.Trainer
+logger: True
+profiler: simple
+deterministic: false
+resume_from_checkpoint: null
+accelerator: auto
+devices: 1
+max_epochs: 30000
+reload_dataloaders_every_n_epochs: 1
+limit_val_batches: 0

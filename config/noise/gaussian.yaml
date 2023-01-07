@@ -1,0 +1,3 @@
+_target_: src.models.Noise
+mu: 0
+sigma: 0.5

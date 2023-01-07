@@ -1,0 +1,12 @@
+actor:
+  _target_: src.models.Actor
+  obs_size: ${process_state.state_size}
+  n_actions: ${action_size}
+  hidden_size: 64
+  num_residuals: 10
+critic:
+  _target_: src.models.Critic
+  obs_size: ${process_state.state_size}
+  n_actions: ${action_size}
+  hidden_size: 64
+  num_residuals: 10
