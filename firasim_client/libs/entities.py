@@ -1,5 +1,8 @@
 from typing import List
 
+NUM_ALLIES = 3
+NUM_OPPONENTS = 3
+
 class Field:    
     height: float = 1.3
     width: float = 1.5
@@ -14,8 +17,6 @@ class Goal:
 class Robot:
     size: float = 0.075
     wheel_radius: float = 0.025
-    num_allies: int = 3
-    num_opponents: int = 3
 
     # [x,y,th]
     infinite_pos = {
@@ -32,7 +33,10 @@ class Robot:
 
     def __init__(self, id: int, ally: bool = True, color: str = "blue"):
         self.id = id
-        self.pos = [0, 0]
+        self.pos = [0.0, 0.0, 0.0]
+        self.velxy = [0.0, 0.0]
+        self.w = 0.0
+
         self.type = "ally" if ally else "opponent"
         self.color = color
     
@@ -41,3 +45,7 @@ class Robot:
 
 class Ball:
     radius: float = 0.02135
+
+    def __init__(self):
+        self.pos = [0, 0]
+        self.velxy = [0, 0]
