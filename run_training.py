@@ -42,7 +42,7 @@ def main(cfg):
         scheduler_conf=cfg.scheduler,
         dataset_conf=cfg.dataset,
         dataloader_conf=cfg.dataloader,
-        process_state_conf=cfg.process_state,
+        process0_state_conf=cfg.process_state,
         watch_metric=cfg.watch_metric,
         noise_conf=cfg.noise,
         save_path=logger.save_dir,

@@ -36,15 +36,15 @@ RUN cd /vsss_ws && \
     mkdir build && \
     cd build && \
     cmake .. && \
-    make
-    # make && \
-    # cd /vsss_ws && \
-    # git clone https://github.com/VSSSLeague/VSSReferee.git && \
-    # cd VSSReferee && \
-    # git checkout CBFRS
+    # make
+    make && \
+    cd /vsss_ws && \
+    git clone https://github.com/VSSSLeague/VSSReferee.git && \
+    cd VSSReferee && \
+    git checkout CBFRS
 
-# RUN cd /vsss_ws/VSSReferee && \
-#     mkdir build && cd build && qmake .. && make
+RUN cd /vsss_ws/VSSReferee && \
+    mkdir build && cd build && qmake .. && make
 
 FROM builder as runner
 
@@ -59,3 +59,4 @@ COPY constants.json /vsss_ws/VSSReferee/src/constants/
 
 # Run FIRASim and VSSReferee
 CMD /vsss_ws/VSSReferee/bin/VSSReferee --3v3 --record false & /vsss_ws/FIRASim/bin/FIRASim - H
+# CMD /vsss_ws/FIRASim/bin/FIRASim
