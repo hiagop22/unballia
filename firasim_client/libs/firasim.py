@@ -123,4 +123,4 @@ if __name__ == "__main__":
             t0 = t1
         # command.write(0, 10, -10)
         command.setPos(1, 0, 0, 0)
-        time.sleep(0.033)
+        # time.sleep(0.01)

@@ -3,13 +3,29 @@ from typing import List
 NUM_ALLIES = 3
 NUM_OPPONENTS = 3
 
-class Field:    
+class Goal:
+    height: float = 0.4
+    depth: float = 0.1
+
+    def __init__(self):
+        self.opponent_goal_pos: float = None
+        self.ally_goal_pos: float = None
+
+
+class Field(Goal):    
     height: float = 1.3
     width: float = 1.5
+    
+    def __init__(self, team_color: str = "blue"):
+        super().__init__()
+        self.team_color = team_color
+        
+        if team_color == "blue":
+            self.opponent_goal_pos = Field/2
+        elif team_color == "yellow":
+            self.opponent_goal_pos = -Field/2
 
-class Goal:
-    width: float = 0.4
-    depth: float = 0.1
+        self.ally_goal_pos = - self.opponent_goal_pos
 
 # GOAL_AREA_WIDTH = 0.7
 # GOAL_AREA_DEPTH = 0.15
@@ -17,6 +33,7 @@ class Goal:
 class Robot:
     size: float = 0.075
     wheel_radius: float = 0.025
+    max_velxy_norm: float = 2.0
 
     # [x,y,th]
     infinite_pos = {
