@@ -6,6 +6,7 @@ sys.path.append(moduleFolder + '/protobuf/')
 sys.path.append(moduleFolder + '/../')
 from firasim_client.libs import packet_pb2
 from firasim_client.libs import constants
+import numpy as np
 import time
 
 class FIRASimVision:
@@ -90,7 +91,7 @@ class FIRASimCommand:
         robot.robot_id = index
         robot.x = x
         robot.y = y
-        robot.orientation = th * 360
+        robot.orientation = th * (180 / np.pi)
         robot.vx = 0
         robot.vy = 0
         robot.vorientation = 0

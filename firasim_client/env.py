@@ -114,17 +114,17 @@ class MarkovDecisionProcess:
         
         self.previous_ball_potential = None
 
-    # def step(self, actions):
-    #     for id in range(self.num_allies_in_field):
-    #         self.lin_and_ang_speed[robot] = (np.clip(actions[robot][0], -self.max_v, self.max_v), 
-    #                                         np.clip(actions[robot][1], -self.max_w, self.max_w))
+    def step(self, actions):
+        for id in range(self.num_allies_in_field):
+            self.lin_and_ang_speed[robot] = (np.clip(actions[robot][0], -self.max_v, self.max_v), 
+                                            np.clip(actions[robot][1], -self.max_w, self.max_w))
 
-    #     self.send_velocities()
-    #     self.get_frame()
-    #     self.update_entity_properties()
-    #     self.current_step += 1
+        self.send_velocities()
+        self.get_frame()
+        self.update_entity_properties()
+        self.current_step += 1
 
-    #     return (self.process_state(), self.reward(), self.done())
+        return (self.process_state(), self.reward(), self.done())
 
     def process_state(self):
         state = {'ally': {}, 
@@ -198,6 +198,7 @@ class MarkovDecisionProcess:
 
         for id in range(self.num_allies_in_field):
             self.ally_robots[id].pos = [*init_pos["allies"][id], theta()]
+            print(self.ally_robots[id].pos)
         
         for id in range(self.num_opponents_in_field):
             self.opponent_robots[id].pos = [*init_pos["opponents"][id], theta()]
@@ -214,7 +215,7 @@ class MarkovDecisionProcess:
 
         for id in range(NUM_ALLIES):            
             ally_command.setPos(id, *self.ally_robots[id].pos)
-        
+            
         for id in range(NUM_OPPONENTS):
             opponent_command.setPos(id, *self.opponent_robots[id].pos)
 
@@ -304,7 +305,7 @@ class MarkovDecisionProcess:
         move_reward = np.clip(move_reward / Ball.max_velxy_norm, -1.0, 1.0)
         return move_reward
 
-if __name__ == "__main__":
-    mdp = MarkovDecisionProcess()
-    state = mdp.reset_random_init_pos()
-    print(state)
+# if __name__ == "__main__":
+#     mdp = MarkovDecisionProcess()
+#     state = mdp.reset_random_init_pos()
+#     print(state)
