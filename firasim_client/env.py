@@ -119,7 +119,7 @@ class MarkovDecisionProcess:
             self.lin_and_ang_speed[robot] = (np.clip(actions[robot][0], -self.max_v, self.max_v), 
                                             np.clip(actions[robot][1], -self.max_w, self.max_w))
 
-        self.send_velocities()
+        self.send_velocities(actions)
         self.get_frame()
         self.update_entity_properties()
         self.current_step += 1
