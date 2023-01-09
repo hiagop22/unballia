@@ -4,8 +4,8 @@ moduleFolder = str(pathlib.Path(__file__).parent.absolute())
 import sys
 sys.path.append(moduleFolder + '/protobuf/')
 sys.path.append(moduleFolder + '/../')
-import packet_pb2
-import constants
+from firasim_client.libs import packet_pb2
+from firasim_client.libs import constants
 import time
 
 class FIRASimVision:
@@ -90,7 +90,7 @@ class FIRASimCommand:
         robot.robot_id = index
         robot.x = x
         robot.y = y
-        robot.orientation = th
+        robot.orientation = th * 360
         robot.vx = 0
         robot.vy = 0
         robot.vorientation = 0

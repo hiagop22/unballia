@@ -21,9 +21,9 @@ class Field(Goal):
         self.team_color = team_color
         
         if team_color == "blue":
-            self.opponent_goal_pos = Field/2
+            self.opponent_goal_pos = Field.width/2
         elif team_color == "yellow":
-            self.opponent_goal_pos = -Field/2
+            self.opponent_goal_pos = -Field.width/2
 
         self.ally_goal_pos = - self.opponent_goal_pos
 
@@ -38,13 +38,13 @@ class Robot:
     # [x,y,th]
     infinite_pos = {
         "ally": [[Field.width, Field.height, 0], 
-                 [Field.width + 10, Field.height + 10, 0], 
-                 [Field.width + 20, Field.height + 20, 0],
+                 [Field.width + 0.10, Field.height + 0.10, 0], 
+                 [Field.width + 0.20, Field.height + 0.20, 0],
                 ],
 
         "opponent": [[-Field.width, Field.height, 0], 
-                     [-Field.width + 10, Field.height + 10, 0], 
-                     [-Field.width + 20, Field.height + 20, 0],
+                     [-Field.width + 0.10, Field.height + 0.10, 0], 
+                     [-Field.width + 0.20, Field.height + 0.20, 0],
                     ]
         }
 

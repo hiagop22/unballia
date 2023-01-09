@@ -12,9 +12,9 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
-import command_pb2 as command__pb2
-import replacement_pb2 as replacement__pb2
-import common_pb2 as common__pb2
+import firasim_client.libs.command_pb2 as command__pb2
+import firasim_client.libs.replacement_pb2 as replacement__pb2
+import firasim_client.libs.common_pb2 as common__pb2
 
 
 DESCRIPTOR = _descriptor.FileDescriptor(

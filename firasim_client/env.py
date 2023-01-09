@@ -5,6 +5,10 @@ from firasim_client.libs.kdtree import KDTree
 from firasim_client.libs.firasim import (FIRASimCommand, FIRASimVision)
 from firasim_client.libs.entities import Field
 from firasim_client.libs.entities import (Robot, Ball, Goal, NUM_ALLIES, NUM_OPPONENTS)
+# from libs.kdtree import KDTree
+# from libs.firasim import (FIRASimCommand, FIRASimVision)
+# from libs.entities import Field
+# from libs.entities import (Robot, Ball, Goal, NUM_ALLIES, NUM_OPPONENTS)
 
 # STATE
 # frame {
@@ -74,10 +78,10 @@ from firasim_client.libs.entities import (Robot, Ball, Goal, NUM_ALLIES, NUM_OPP
 # ALLY GOAL SUPOSED TO BEE ALWAYES IN NEGATIVE X
 
 def x(): 
-    return random.uniform(-Field.width/2 + 10, Field.width/2 - 10)
+    return random.uniform(-Field.width/2 + 0.10, Field.width/2 - 0.10)
 
 def y(): 
-    return random.uniform(-Field.height/2 + 10, Field.height/2 - 10)
+    return random.uniform(-Field.height/2 + 0.10, Field.height/2 - 0.10)
 
 def theta(): 
     return random.uniform(0, 2*math.pi)
@@ -98,59 +102,64 @@ class MarkovDecisionProcess:
         
         self.vision = FIRASimVision()
 
-        self.blue_command = FIRASimCommand()
-        self.yellow_command = FIRASimCommand(team_yellow=True)
-
         self.current_step = 0
         self.max_steps = max_steps_per_episode
 
         self.ball = Ball()
         self.ally_robots = [Robot(id=id, ally=True, color=team_color) 
-                            for id in range(Robot.num_allies)]
+                            for id in range(NUM_ALLIES)]
         self.opponent_robots = [Robot(id=id, ally=False, color=opponent_color) 
-                                for id in range(Robot.num_opponents)]
+                                for id in range(NUM_OPPONENTS)]
         self.field = Field(team_color=team_color)
         
         self.previous_ball_potential = None
 
-    def step(self, actions):
-        for id in range(self.num_allies_in_field):
-            self.lin_and_ang_speed[robot] = (np.clip(actions[robot][0], -self.max_v, self.max_v), 
-                                            np.clip(actions[robot][1], -self.max_w, self.max_w))
+    # def step(self, actions):
+    #     for id in range(self.num_allies_in_field):
+    #         self.lin_and_ang_speed[robot] = (np.clip(actions[robot][0], -self.max_v, self.max_v), 
+    #                                         np.clip(actions[robot][1], -self.max_w, self.max_w))
 
-        self.send_velocities()
-        self.get_frame()
-        self.update_entity_properties()
-        self.current_step += 1
+    #     self.send_velocities()
+    #     self.get_frame()
+    #     self.update_entity_properties()
+    #     self.current_step += 1
 
-        return (self.process_state(), self.reward(), self.done())
+    #     return (self.process_state(), self.reward(), self.done())
 
     def process_state(self):
-        state = {'allie': {}, 
+        state = {'ally': {}, 
                  'opponent': {}, 
                  'ball': {},
                  }
         
         for id in range(self.num_allies_in_field):
-            state['allie'][id] = { 'pos_xy': np.array([self.ally_robots.pos[0],self.ally_robots.pos[1]]), 
-                                   'theta': self.ally_robots.pos[2], 
-                                   'v': np.array(self.ally_robots[id].velxy),
+            state['ally'][id] = { 'pos_xy': np.array([self.ally_robots[id].pos[0],self.ally_robots[id].pos[1]]), 
+                                   'theta': self.ally_robots[id].pos[2], 
+                                   'vel_xy': np.array(self.ally_robots[id].velxy),
                                    'w': self.ally_robots[id].w}
 
         for id in range(self.num_opponents_in_field):
-            state['opponent'][id] = { 'pos_xy': np.array([self.opponent_robots.pos[0],self.opponent_robots.pos[1]]), 
-                                      'theta': self.opponent_robots.pos[2], 
-                                      'v': np.array(self.opponent_robots[id].velxy),
+            state['opponent'][id] = { 'pos_xy': np.array([self.opponent_robots[id].pos[0],self.opponent_robots[id].pos[1]]), 
+                                      'theta': self.opponent_robots[id].pos[2], 
+                                      'vel_xy': np.array(self.opponent_robots[id].velxy),
                                       'w': self.opponent_robots[id].w}
         
         state['ball'] = {'pos_xy':np.array(self.ball.pos), 
-                         'v': np.array(self.ball.velxy),
+                         'vel_xy': np.array(self.ball.velxy),
                          }
                                         
         return state
 
     def reset_random_init_pos(self):
         self.current_step = 0
+
+        self._set_entities_positions()
+
+        self._send_positions2fira()
+
+        return self.process_state()
+
+    def _set_entities_positions(self):
 
         ball_pos = [x(), y()]
 
@@ -159,7 +168,7 @@ class MarkovDecisionProcess:
                     "opponents": [],
                     }
 
-        min_dist = 10
+        min_dist = 0.10
         places = KDTree()
         places.insert(ball_pos)
 
@@ -181,21 +190,33 @@ class MarkovDecisionProcess:
                 pos = [x(), y()]
 
             places.insert(pos)
-            init_pos.append(pos)
+            init_pos["opponents"].append(pos)
 
         if self.num_opponents_in_field < NUM_OPPONENTS:
             for id in range(self.num_opponents_in_field, NUM_OPPONENTS):
                 self.opponent_robots[id].move_outside_field()
 
         for id in range(self.num_allies_in_field):
-            self.ally_robots[id].pos = [*init_pos["allies"], theta()]
+            self.ally_robots[id].pos = [*init_pos["allies"][id], theta()]
         
         for id in range(self.num_opponents_in_field):
-            self.opponent_robots[id].pos = [*init_pos["opponents"], theta()]
+            self.opponent_robots[id].pos = [*init_pos["opponents"][id], theta()]
 
         self.ball.pos = init_pos["ball"]
 
-        return self.process_state()
+    def _send_positions2fira(self):
+        team_yellow = True if self.field.team_color == "yellow" else False
+
+        ally_command = FIRASimCommand(team_yellow = team_yellow)
+        opponent_command = FIRASimCommand(team_yellow = not team_yellow)
+
+        ally_command.setBallPos(self.ball.pos[0], self.ball.pos[1])
+
+        for id in range(NUM_ALLIES):            
+            ally_command.setPos(id, *self.ally_robots[id].pos)
+        
+        for id in range(NUM_OPPONENTS):
+            opponent_command.setPos(id, *self.opponent_robots[id].pos)
 
     def reward(self):
         """
@@ -205,11 +226,11 @@ class MarkovDecisionProcess:
         reward = 0
 
         # ALLY GOAL SUPOSED TO BEE ALWAYES IN NEGATIVE X
-        # I changed from 10 to 100. Article is using 10
+        
         if self.ball.pos[0] > self.field.opponent_goal_pos[0]:
-            reward = 100
+            reward = 10
         elif self.ball.pos[0] < self.field.ally_goal_pos[0]:
-            reward = -100  
+            reward = -10  
         else:
 
             w_move = 0.2
@@ -286,3 +307,4 @@ class MarkovDecisionProcess:
 if __name__ == "__main__":
     mdp = MarkovDecisionProcess()
     state = mdp.reset_random_init_pos()
+    print(state)
