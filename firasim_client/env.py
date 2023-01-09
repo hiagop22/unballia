@@ -205,10 +205,11 @@ class MarkovDecisionProcess:
         reward = 0
 
         # ALLY GOAL SUPOSED TO BEE ALWAYES IN NEGATIVE X
+        # I changed from 10 to 100. Article is using 10
         if self.ball.pos[0] > self.field.opponent_goal_pos[0]:
-            reward = 10
+            reward = 100
         elif self.ball.pos[0] < self.field.ally_goal_pos[0]:
-            reward = -10  
+            reward = -100  
         else:
 
             w_move = 0.2
@@ -272,14 +273,14 @@ class MarkovDecisionProcess:
         '''
 
         ball_pos = np.array(self.ball.pos)
-        robot_pos = np.array([self.ally_robots[0].pos[0], self.ally_robots[0].pos[1]])
-        robot_velxy = np.array(self.ally_robots[0].velxy)
-        robot_ball = ball_pos - robot_pos
-        unit_robot_ball = robot_ball/np.linalg.norm(robot_ball)
+        opponent_goal_pos = np.array(self.field.opponent_goal_pos)
+        ball_velxy = np.array(self.ball.velxy)
+        ball_opponent_goal = opponent_goal_pos - ball_pos
+        unit_ball_opponent_goal = ball_opponent_goal/np.linalg.norm(ball_opponent_goal)
 
-        move_reward = np.dot(unit_robot_ball, robot_velxy)
+        move_reward = np.dot(unit_ball_opponent_goal, ball_velxy)
 
-        move_reward = np.clip(move_reward / Robot.max_velxy_norm, -1.0, 1.0)
+        move_reward = np.clip(move_reward / Ball.max_velxy_norm, -1.0, 1.0)
         return move_reward
 
 if __name__ == "__main__":

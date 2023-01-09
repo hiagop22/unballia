@@ -62,7 +62,8 @@ class Robot:
 
 class Ball:
     radius: float = 0.02135
-
+    max_velxy_norm: float = 2.0
+    
     def __init__(self):
         self.pos = [0, 0]
         self.velxy = [0, 0]
