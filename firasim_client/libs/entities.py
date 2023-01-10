@@ -60,6 +60,20 @@ class Robot:
     def move_outside_field(self):
         self.pos = Robot.infinite_pos[self.type][self.id]
 
+    @classmethod
+    def vel_whells2vel_vw(cls, vl, vr):
+        v = Robot.wheel_radius * (vl + vr) / 2
+        w = Robot.wheel_radius * (vr - vl) / Robot.size
+    
+        return {"v": v, "w": w}
+
+    @classmethod
+    def vel_vw2vel_whells(cls, v, w):
+        vr = (v + (Robot.size/2)*w) / Robot.wheel_radius
+        vl = (v - (Robot.size/2)*w) / Robot.wheel_radius
+
+        return {"vl": vl, "vr": vr}
+        
 class Ball:
     radius: float = 0.02135
     max_velxy_norm: float = 2.0

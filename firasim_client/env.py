@@ -1,10 +1,12 @@
+import time
 import random
 import math
 import numpy as np
 from firasim_client.libs.kdtree import KDTree
 from firasim_client.libs.firasim import (FIRASimCommand, FIRASimVision)
 from firasim_client.libs.entities import Field
-from firasim_client.libs.entities import (Robot, Ball, Goal, NUM_ALLIES, NUM_OPPONENTS)
+from firasim_client.libs.entities import (Robot, Ball, NUM_ALLIES, NUM_OPPONENTS)
+
 # from libs.kdtree import KDTree
 # from libs.firasim import (FIRASimCommand, FIRASimVision)
 # from libs.entities import Field
@@ -95,15 +97,21 @@ class MarkovDecisionProcess:
                  opponent_color: str = "yellow",
                  num_allies_in_field: int = 1,
                  num_opponents_in_field: int = 0,
+                 time_step: float = 0.02
                  ):
 
         self.num_allies_in_field = num_allies_in_field
         self.num_opponents_in_field = num_opponents_in_field
         
         self.vision = FIRASimVision()
+        self.ally_command = FIRASimCommand( team_yellow = True 
+                                            if team_color == "yellow"
+                                            else False
+                                            )
 
         self.current_step = 0
         self.max_steps = max_steps_per_episode
+        self.time_step = time_step
 
         self.ball = Ball()
         self.ally_robots = [Robot(id=id, ally=True, color=team_color) 
@@ -115,16 +123,53 @@ class MarkovDecisionProcess:
         self.previous_ball_potential = None
 
     def step(self, actions):
-        for id in range(self.num_allies_in_field):
-            self.lin_and_ang_speed[robot] = (np.clip(actions[robot][0], -self.max_v, self.max_v), 
-                                            np.clip(actions[robot][1], -self.max_w, self.max_w))
 
-        self.send_velocities(actions)
-        self.get_frame()
-        self.update_entity_properties()
+        self.__send_velocities2firasim(actions)
+        firasim_frame = self.__get_firasim_frame()
+        self.__update_entity_properties(firasim_frame)
         self.current_step += 1
 
         return (self.process_state(), self.reward(), self.done())
+
+    def __send_velocities2firasim(self, actions):
+        """actions: tuple [[V, W]]"""
+        
+        tmp_actions = []
+        for id in self.num_allies_in_field:
+            vels = Robot.vel_vw2vel_whells(*actions[id])
+            vl, vr = vels["vl"], vels["vr"]
+            tmp_actions.append((id, (vl, vr)))
+
+        self.ally_command.writeMulti(tmp_actions)
+
+    def __get_firasim_frame(self):
+        last_packet = None
+        
+        last_time = time.time()
+        while True:
+            if (time.time() - last_time) < self.time_step:
+                packet = self.vision.read()
+                if packet is not None:
+                    last_packet = packet
+            else:
+                break
+
+        return last_packet
+
+    def __update_entity_properties(self, message):
+
+        if self.field.team_color == "blue":
+            robots = message.frame.robots_blue
+        elif self.field.team_color == "yellow":
+            robots = message.frame.robots_yellow
+
+        for robot in robots:
+            self.ally_robots[robot.robot_id].pos = [robot.x, robot.y, robot.orientation]
+            self.ally_robots[robot.robot_id].velxy = [robot.vx, robot.vy]
+            self.ally_robots[robot.robot_id].w = robot.vorientation
+
+        self.ball.pos = [message.frame.ball.x, message.frame.ball.y]
+        self.ball.velxy = [message.frame.ball.vx, message.frame.ball.vy]
 
     def process_state(self):
         state = {'ally': {}, 
@@ -153,13 +198,13 @@ class MarkovDecisionProcess:
     def reset_random_init_pos(self):
         self.current_step = 0
 
-        self._set_entities_positions()
+        self.__set_entities_positions()
 
-        self._send_positions2fira()
+        self.__send_positions2fira()
 
         return self.process_state()
 
-    def _set_entities_positions(self):
+    def __set_entities_positions(self):
 
         ball_pos = [x(), y()]
 
@@ -205,16 +250,15 @@ class MarkovDecisionProcess:
 
         self.ball.pos = init_pos["ball"]
 
-    def _send_positions2fira(self):
+    def __send_positions2fira(self):
         team_yellow = True if self.field.team_color == "yellow" else False
 
-        ally_command = FIRASimCommand(team_yellow = team_yellow)
         opponent_command = FIRASimCommand(team_yellow = not team_yellow)
 
-        ally_command.setBallPos(self.ball.pos[0], self.ball.pos[1])
+        self.ally_command.setBallPos(self.ball.pos[0], self.ball.pos[1])
 
         for id in range(NUM_ALLIES):            
-            ally_command.setPos(id, *self.ally_robots[id].pos)
+            self.ally_command.setPos(id, *self.ally_robots[id].pos)
             
         for id in range(NUM_OPPONENTS):
             opponent_command.setPos(id, *self.opponent_robots[id].pos)
