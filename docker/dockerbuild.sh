@@ -4,4 +4,5 @@
 xhost +local:docker
 
 ## Buildando o docker
-docker buildx build . -f Dockerfile -t thunderatz/firasim:latest
+docker-compose build
+# docker buildx build . -f Dockerfile -t thunderatz/firasim:latest

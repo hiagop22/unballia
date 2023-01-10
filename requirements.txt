@@ -1,7 +1,6 @@
-boto3==1.26.3
-clearml==1.7.2
+boto3==1.24.62
+clearml==1.6.4
 hydra-core==1.2.0
-numpy==1.23.4
-onnxruntime==1.13.1
+numpy==1.23.1
+onnxruntime==1.12.1
 pytorch-lightning==1.7.7
-git+https://github.com/unball/python_simulator@master

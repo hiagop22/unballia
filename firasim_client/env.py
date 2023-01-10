@@ -249,7 +249,6 @@ class MarkovDecisionProcess:
 
         for id in range(self.num_allies_in_field):
             self.ally_robots[id].pos = [*init_pos["allies"][id], theta()]
-            print(self.ally_robots[id].pos)
         
         for id in range(self.num_opponents_in_field):
             self.opponent_robots[id].pos = [*init_pos["opponents"][id], theta()]

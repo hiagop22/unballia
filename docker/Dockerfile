@@ -1,12 +1,12 @@
-FROM ubuntu:18.04 as cacher
+FROM ubuntu:20.04 as system
 
 # Set working directory
 RUN mkdir /vsss_ws
 WORKDIR /vsss_ws
 
 # Install dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential \
     g++ \
     cmake \
     git \
@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y \
     libglu1-mesa-dev \
     libprotobuf-dev \
     protobuf-compiler \
-    libode-dev \
+    libode-dev \ 
     libboost-dev \
     sudo && \
     apt-get clean && \
@@ -26,9 +26,9 @@ RUN apt-get update && apt-get install -y \
     mkdir build && cd build && \
     cmake .. && make && sudo make install
 
-FROM cacher as builder
+FROM system as simulator
 
-# Install FIRASim and VSSReferee
+# Install FIRASim
 RUN cd /vsss_ws && \
     git clone https://github.com/VSSSLeague/FIRASim.git && \
     cd FIRASim && \
@@ -36,17 +36,9 @@ RUN cd /vsss_ws && \
     mkdir build && \
     cd build && \
     cmake .. && \
-    # make
-    make && \
-    cd /vsss_ws && \
-    git clone https://github.com/VSSSLeague/VSSReferee.git && \
-    cd VSSReferee && \
-    git checkout CBFRS
+    make
 
-RUN cd /vsss_ws/VSSReferee && \
-    mkdir build && cd build && qmake .. && make
-
-FROM builder as runner
+FROM simulator as display
 
 # Set enviroment variables
 ENV DISPLAY=:0
@@ -55,10 +47,22 @@ ENV QT_X11_NO_MITSHM=1
 RUN mkdir -m 700 /tmp/runtime-root
 ENV XDG_RUNTIME_DIR=/tmp/runtime-root
 
-COPY constants.json /vsss_ws/VSSReferee/src/constants/
 
-# Run FIRASim and VSSReferee
-# CMD /vsss_ws/VSSReferee/bin/VSSReferee --3v3 --record false & /vsss_ws/FIRASim/bin/FIRASim - H
-# CMD /vsss_ws/FIRASim/bin/FIRASim --xlr8
-CMD /vsss_ws/FIRASim/bin/FIRASim --atkfault
-# CMD /vsss_ws/FIRASim/bin/FIRASim -H
+FROM display as python
+
+RUN apt install software-properties-common -y && \
+    add-apt-repository ppa:deadsnakes/ppa && \
+    DEBIAN_FRONTEND=noninteractive apt install python3.10 -y && \
+    apt install python3-pip -y && \
+    pip3 install --upgrade pip
+
+
+FROM python as files
+
+COPY . /vsss_ws/unballia
+
+# RUN pip3 install -r /vsss_ws/unballia/requirements.txt
+
+
+# CMD /vsss_ws/FIRASim/bin/FIRASim -H & python3.10 /vsss_ws/unballia/run_training.py
+CMD /vsss_ws/FIRASim/bin/FIRASim
