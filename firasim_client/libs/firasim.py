@@ -69,8 +69,7 @@ class FIRASimCommand:
 
     def writeMulti(self, actions):
         packet = packet_pb2.Packet()
-        print(">> ACTIONS")
-        print(actions)
+        
         for i, (vl, vr) in enumerate(actions):
             command = packet.cmd.robot_commands.add()
 

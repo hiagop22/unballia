@@ -17,9 +17,10 @@ if __name__ == "__main__":
                 last_packet = packet
         else:
             break
-
-    # print(last_packet)
-    next_state, reward, done = mdp.step([[0.2, 0.2]])
-    print(next_state)
-    print(reward)
-    print(done)
+    
+    while True:
+        time.sleep(0.1)
+        next_state, reward, done = mdp.step([[0.0, 0.0]])
+        print(next_state)
+        # print(reward)
+        # print(done)

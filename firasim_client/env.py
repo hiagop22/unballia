@@ -153,7 +153,12 @@ class MarkovDecisionProcess:
                 if packet is not None:
                     last_packet = packet
             else:
-                break
+                if last_packet == None:
+                    last_time = time.time()
+                else:
+                    break
+
+
 
         return last_packet
 
