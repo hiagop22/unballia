@@ -18,4 +18,8 @@ if __name__ == "__main__":
         else:
             break
 
-    print(last_packet)
+    # print(last_packet)
+    next_state, reward, done = mdp.step([[0.2, 0.2]])
+    print(next_state)
+    print(reward)
+    print(done)

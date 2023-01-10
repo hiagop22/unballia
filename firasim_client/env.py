@@ -135,11 +135,12 @@ class MarkovDecisionProcess:
         """actions: tuple [[V, W]]"""
         
         tmp_actions = []
-        for id in self.num_allies_in_field:
+        for id in range(self.num_allies_in_field):
             vels = Robot.vel_vw2vel_whells(*actions[id])
             vl, vr = vels["vl"], vels["vr"]
-            tmp_actions.append((id, (vl, vr)))
+            tmp_actions.append((vl, vr))
 
+        
         self.ally_command.writeMulti(tmp_actions)
 
     def __get_firasim_frame(self):
@@ -301,13 +302,13 @@ class MarkovDecisionProcess:
         if self.current_step > self.max_steps:
             return True
             
-        return True if abs(self.ball.pos[0]) > abs(self.field.x_ally_goal) else False
+        return True if abs(self.ball.pos[0]) > abs(self.field.ally_goal_pos[0]) else False
 
     def __energy_penalty(self):
 
         energy_penalty = 0
 
-        for id in self.num_allies_in_field:
+        for id in range(self.num_allies_in_field):
             linearVelocity = math.sqrt(self.ally_robots[id].velxy[0]**2 + self.ally_robots[id].velxy[1]**2)
             en_penalty_1 = abs(linearVelocity)
             en_penalty_2 = abs(self.ally_robots[id].w)

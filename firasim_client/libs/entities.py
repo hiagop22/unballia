@@ -8,8 +8,8 @@ class Goal:
     depth: float = 0.1
 
     def __init__(self):
-        self.opponent_goal_pos: float = None
-        self.ally_goal_pos: float = None
+        self.opponent_goal_pos: List[float, float] = None
+        self.ally_goal_pos: List[float, float] = None
 
 
 class Field(Goal):    
@@ -21,11 +21,11 @@ class Field(Goal):
         self.team_color = team_color
         
         if team_color == "blue":
-            self.opponent_goal_pos = Field.width/2
+            self.opponent_goal_pos = [Field.width/2, 0]
         elif team_color == "yellow":
-            self.opponent_goal_pos = -Field.width/2
+            self.opponent_goal_pos = [-Field.width/2, 0]
 
-        self.ally_goal_pos = - self.opponent_goal_pos
+        self.ally_goal_pos = [-self.opponent_goal_pos[0], 0]
 
 # GOAL_AREA_WIDTH = 0.7
 # GOAL_AREA_DEPTH = 0.15
