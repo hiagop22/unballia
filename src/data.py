@@ -18,11 +18,11 @@ class ProcessStateV1:
     def process(self, state):
         robot2control = 0
 
-        robot = state['allie'][robot2control]['pos_xy']
-        angle_robot = state['allie'][robot2control]['theta']
+        robot = state['ally'][robot2control]['pos_xy']
+        angle_robot = state['ally'][robot2control]['theta']
         ball = state['ball']['pos_xy']
-        v_robot = state['allie'][robot2control]['v']
-        v_ball = state['ball']['v']
+        v_robot = state['ally'][robot2control]['vel_xy']
+        v_ball = state['ball']['vel_xy']
         robot_vel_unit = np.array([math.cos(angle_robot), math.sin(angle_robot)])
         # Remove the number later and use constant
         goal = np.array([0.75,0])
@@ -57,11 +57,12 @@ class AbsoluteState:
     def process(self, state):
         robot2control = 0
 
-        robot = state['allie'][robot2control]['pos_xy']
-        angle_robot = state['allie'][robot2control]['theta']
+        robot = state['ally'][robot2control]['pos_xy']
+        angle_robot = state['ally'][robot2control]['theta']
+        v_robot = state['ally'][robot2control]['vel_xy']
+        w_robot = state['ally'][robot2control]['w']
         ball = state['ball']['pos_xy']
-        v_robot = state['allie'][robot2control]['v']
-        v_ball = state['ball']['v']
+        v_ball = state['ball']['vel_xy']
         robot_vel_unit = np.array([math.cos(angle_robot), math.sin(angle_robot)])
         # Remove the number later and use constant
         goal = np.array([0.75,0])
@@ -72,7 +73,8 @@ class AbsoluteState:
                             v_ball[0],v_ball[1],
                             goal[0], goal[1],
                             -goal[0], -goal[1],
-                            angle_robot]
+                            angle_robot, w_robot,
+                            ]
 
         return processed_state
 
@@ -88,12 +90,12 @@ class ProcessStateV3:
     def process(self, state):
         robot2control = 0
 
-        robot = state['allie'][robot2control]['pos_xy']
-        angle_robot = state['allie'][robot2control]['theta']
+        robot = state['ally'][robot2control]['pos_xy']
+        angle_robot = state['ally'][robot2control]['theta']
         ball = state['ball']['pos_xy']
-        v_robot = state['allie'][robot2control]['v']
-        w_robot = state['allie'][robot2control]['w']
-        v_ball = state['ball']['v']
+        v_robot = state['ally'][robot2control]['vel_xy']
+        w_robot = state['ally'][robot2control]['w']
+        v_ball = state['ball']['vel_xy']
         robot_vel_unit = np.array([math.cos(angle_robot), math.sin(angle_robot)])
         opponent_goal = np.array([0.85,0.0])
         ally_goal = -opponent_goal

@@ -10,7 +10,7 @@ defaults:
   - dataloader: default
   - watch_metric: default
   - onnx: default
-  - agent: a2c
+  - agent: default
   - test: default
   - process_state: absolute
   - env: FiraSim

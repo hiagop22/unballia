@@ -2,7 +2,7 @@ import time
 from firasim_client.env import MarkovDecisionProcess
 
 if __name__ == "__main__":
-    loop_time = 0.02
+    loop_time = 0.008
     env = MarkovDecisionProcess()
     state = env.reset_random_init_pos()
     # print(state)

@@ -1,2 +1,2 @@
 _target_: src.data.ReplayBuffer
-memory_size: 1000000
+memory_size: 1500000000

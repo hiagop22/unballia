@@ -39,11 +39,10 @@ def main(cfg):
         scheduler_conf=cfg.scheduler,
         dataset_conf=cfg.dataset,
         dataloader_conf=cfg.dataloader,
-        process0_state_conf=cfg.process_state,
+        process_state_conf=cfg.process_state,
         watch_metric=cfg.watch_metric,
-        noise_conf=cfg.noise,
         save_path=logger.save_dir,
-        # _recursive_=False,
+        _recursive_=False,
         )
         
     # if cfg.pre_trained:

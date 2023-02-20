@@ -4,8 +4,5 @@ max_grad_norm:
   actor: 0.1
   critic: 1.0
 tau: 0.001
+entropy_beta: 0.002
 upload_onnx_sync: ${upload_onnx_sync}
-epsilon_decay: 0.0004
-epsilon_start: 1.0
-epsilon_end: 0.01
-episode_init_decay: 0

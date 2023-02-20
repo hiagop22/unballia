@@ -11,10 +11,8 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data.dataloader import DataLoader
 from .data import Experience, ReplayBuffer
 from .utils import save_onnx, norm_grad
-from PythonSimulator.field import Env
 import torch.nn.init as init
 import torch.nn.functional as F
-from firasim_client.env import MarkovDecisionProcess
 
 class Actor(nn.Module):
     """
@@ -41,14 +39,14 @@ class Actor(nn.Module):
             nn.Sigmoid(),
         )
 
-        init.xavier_normal_(self.hidden_layers.weight)
-        init.xavier_normal_(self.mu.weight)
-        init.xavier_normal_(self.std.weight)
+        # init.xavier_normal_(self.hidden_layers.weight)
+        # init.xavier_normal_(self.mu.weight)
+        # init.xavier_normal_(self.std.weight)
 
     def forward(self, x):
         x = self.hidden_layers(x.float())
         means = self.mu(x)
-        stds = F.softPlus(self.std(x)) + 1e-5
+        stds = torch.add(self.std(x), 1e-5)
 
         return torch.distributions.Normal(means, stds)
 
@@ -77,13 +75,12 @@ class Agent:
         env: training environment
         replay_buffer: replay buffer storing experiences
     """
-    def __init__(self, env: Env, replay_buffer: ReplayBuffer, process_state, max_v: float, max_w: float, loop_time: float,):
+    def __init__(self, env, replay_buffer: ReplayBuffer, process_state, max_v: float, max_w: float):
 
         self.env = env
         self.replay_buffer = replay_buffer
         self.process_state = process_state
         self.state = self.env.reset_random_init_pos()
-        self.loop_time = loop_time
         
         self.max_v = max_v
         self.max_w = max_w
@@ -108,24 +105,11 @@ class Agent:
         self.reset()
         done = False
         
-        last_time = time.time()
-        last_packet = None
-        loop_time = 0.02
-        env = MarkovDecisionProcess()
-        
         while not done:
             action = self.get_action(net)
             env_action = np.reshape(action, (-1,2))
             env_action[0] = env_action[0]*np.array([self.max_v,self.max_w])
-
-            while True:
-                if(time.time() - last_time) < loop_time:
-                    packet = env.vision.read()
-                    if packet is not None:
-                        last_packet = packet
-                else:
-                    break
-
+            
             new_state, reward, done = self.env.step(env_action)
             exp = Experience(self.process_state.process(self.state), action, reward, done, self.process_state.process(new_state))
 
@@ -165,8 +149,7 @@ class PPOStrategy(pl.LightningModule):
 
         self.save_hyperparameters()
 
-        # Alterar o max steps depois
-        self.env = hydra.utils.instantiate(env_conf, render=False, max_steps_episode=600)
+        self.env = hydra.utils.instantiate(env_conf)
 
         self.actor = hydra.utils.instantiate(model_conf.actor)
         self.critic = hydra.utils.instantiate(model_conf.critic)
@@ -188,7 +171,8 @@ class PPOStrategy(pl.LightningModule):
         self.watch_metric = watch_metric
         
         self.gamma = gamma
-        self.entropy_beta = entropy_beta
+        # self.entropy_beta = entropy_beta
+        self.entropy_beta = 0
         self.max_grad_norm = max_grad_norm
         self.tau = tau
         self.upload_onnx_sync = upload_onnx_sync

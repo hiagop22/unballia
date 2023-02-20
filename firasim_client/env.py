@@ -92,7 +92,7 @@ def theta():
 
 class MarkovDecisionProcess:
     def __init__(self, 
-                 max_steps_per_episode: int = 10000,         
+                 max_time_per_episode: int = 60*5,
                  team_color: str = "blue",
                  opponent_color: str = "yellow",
                  num_allies_in_field: int = 1,
@@ -110,7 +110,7 @@ class MarkovDecisionProcess:
                                             )
 
         self.current_step = 0
-        self.max_steps = max_steps_per_episode
+        self.max_time_per_episode = max_time_per_episode
         self.time_step = time_step
 
         self.ball = Ball()
@@ -158,8 +158,6 @@ class MarkovDecisionProcess:
                 else:
                     break
 
-
-
         return last_packet
 
     def __update_entity_properties(self, message):
@@ -202,7 +200,7 @@ class MarkovDecisionProcess:
         return state
 
     def reset_random_init_pos(self):
-        self.current_step = 0
+        self.init_time = time.time()
 
         self.__set_entities_positions()
 
@@ -303,7 +301,7 @@ class MarkovDecisionProcess:
 
     def done(self):
         
-        if self.current_step > self.max_steps:
+        if (time.time() - self.init_time) > self.max_time_per_episode:
             return True
             
         return True if abs(self.ball.pos[0]) > abs(self.field.ally_goal_pos[0]) else False
