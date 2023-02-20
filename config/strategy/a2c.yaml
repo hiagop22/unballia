@@ -1,4 +1,4 @@
-_target_: src.models.A2CStrategy
+_target_: src.models.PPOStrategy
 gamma: 0.9
 max_grad_norm:
   actor: 0.1

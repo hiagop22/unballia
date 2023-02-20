@@ -92,7 +92,7 @@ def theta():
 
 class MarkovDecisionProcess:
     def __init__(self, 
-                 max_steps_per_episode: int = 100,         
+                 max_steps_per_episode: int = 10000,         
                  team_color: str = "blue",
                  opponent_color: str = "yellow",
                  num_allies_in_field: int = 1,

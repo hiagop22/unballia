@@ -3,10 +3,7 @@ import shutil
 import os
 import clearml
 from src.utils import save_onnx
-import torch
 import pytorch_lightning as pl
-
-os.environ['CLEARML_CONFIG_FILE'] = '~/1_clearml_unball.conf'
 
 @hydra.main(version_base='1.2', config_path='config', config_name='config')
 def main(cfg):
@@ -46,19 +43,19 @@ def main(cfg):
         watch_metric=cfg.watch_metric,
         noise_conf=cfg.noise,
         save_path=logger.save_dir,
-        _recursive_=False,
+        # _recursive_=False,
         )
         
-    if cfg.pre_trained:
-        task = clearml.Task.get_task(task_id=cfg.pre_trained_id)
-        list_model = task.get_models()["output"][-1]
-        ckpt_path = str(list_model.get_local_copy())
+    # if cfg.pre_trained:
+    #     task = clearml.Task.get_task(task_id=cfg.pre_trained_id)
+    #     list_model = task.get_models()["output"][-1]
+    #     ckpt_path = str(list_model.get_local_copy())
 
-        while not ckpt_path.endswith('last.ckpt'):
-            ckpt_path = str(list_model.get_local_copy())
+    #     while not ckpt_path.endswith('last.ckpt'):
+    #         ckpt_path = str(list_model.get_local_copy())
 
-        strategy_model.load_state_dict(torch.load(ckpt_path, map_location=torch.device('cuda' if torch.cuda.is_available() 
-                                                        else 'cpu'))['state_dict'])
+    #     strategy_model.load_state_dict(torch.load(ckpt_path, map_location=torch.device('cuda' if torch.cuda.is_available() 
+    #                                                     else 'cpu'))['state_dict'])
     
     trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks)
     try: 

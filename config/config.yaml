@@ -4,7 +4,6 @@ defaults:
   - scheduler: ReduceLROnPlateau
   - trainer: local
   - model: default
-  - env: PythonSimulator
   - replaybuffer: default
   - strategy: a2c
   - dataset: default
@@ -13,14 +12,13 @@ defaults:
   - onnx: default
   - agent: a2c
   - test: default
-  - process_state: relative_full_info
-  - noise: gaussian
+  - process_state: absolute
+  - env: FiraSim
 
 action_size: 2
 project_name: reinforcement_learning
-task_name: continuous_a2c_strategy
+task_name: ppo
 seed: 747
 upload_onnx_sync: 10
 pre_trained: False
-pre_trained_id: 4c137e1dd96144588cda4e90a2299b1d
 logdir: ./outputs

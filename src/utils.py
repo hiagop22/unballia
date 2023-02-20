@@ -51,12 +51,6 @@ def conv2onnx(model, outpath, size):
         },
     )
 
- # takes in a module and applies the specified weight initialization
-def weights_init(m):
-    # for every Linear layer in a model..
-    if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
-        m.weight.data.normal_(0.0, 0.02)
-        m.bias.data.fill_(0)
 
 def angle_between(v1, v2):
     """ Returns the angle in radians between vectors 'v1' and 'v2' in rads. The angle can be positive or negative
@@ -87,15 +81,6 @@ def upload_data(data):
     task = Task.current_task()
     task.upload_artifact(name='data', artifact_object=data)
 
-def hard_update(target, source):
-    for target_param, param in zip(target.parameters(), source.parameters()):
-            target_param.data.copy_(param.data)
-
-def soft_update(target, source, tau):
-    for target_param, param in zip(target.parameters(), source.parameters()):
-        target_param.data.copy_(
-            target_param.data * (1.0 - tau) + param.data * tau
-        )
 def norm_grad(model):
     total_norm = 0
     parameters = [p for p in model.parameters() if p.grad is not None and p.requires_grad]

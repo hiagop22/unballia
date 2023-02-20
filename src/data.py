@@ -4,7 +4,6 @@ from .utils import normalized_angle
 from torch.utils import data as tdata
 import math
 
-
 # Named tuple for storing experience steps gathered in training
 Experience = namedtuple(
     'Experience',
@@ -49,8 +48,9 @@ class ProcessStateV1:
                             ] 
         
         return processed_state
+        
 
-class ProcessStateV2:
+class AbsoluteState:
     def __init__(self, state_size: int):
         self.state_size = state_size
 
@@ -176,16 +176,21 @@ class ReplayBuffer(object):
         self.buffer.append(experience)
 
     def normalize_rewards(self, gamma: float):
-        running_add = 0
-        len_buffer = len(self.buffer)
-        discounted_r = np.array([0 for _ in range(len_buffer)], dtype=np.float32)
+        discounted_r = 0
+        
+        rewards = []
+        
+        for i in self.buffer:
+            rewards.append(self.buffer[i].reward)
 
-        for i in reversed(range(len_buffer)):
-            running_add = running_add * gamma + self.buffer[i].reward
-            discounted_r[i] = running_add
+        rewards = np.array(rewards)
+        mean = rewards.mean()
+        std = rewards.std() + 1e-5
 
-        for i, (state, action, _, done, new_state) in enumerate(self.buffer):
-            self.memory.append((state, action, discounted_r[i], done, new_state))
+        for state, action, reward, done, new_state in reversed(self.buffer):
+            discounted_r = discounted_r * gamma + ((reward - mean) / std)
+
+            self.memory.append((state, action, discounted_r, done, new_state))     
 
     def getitem(self, idx):
         return self.memory[idx]
@@ -211,14 +216,14 @@ class RLDataset(tdata.Dataset):
         return len(self.buffer.memory)
 
     def __getitem__(self, idx):
-        states, actions, rewards, dones, next_states = self.buffer.getitem(idx)
+        state, action, reward, done, next_state = self.buffer.getitem(idx)
 
         return (
-            np.array(states),
-            np.array(actions),
-            np.array(rewards, dtype=np.float32),
-            np.array(dones, dtype=np.bool),
-            np.array(next_states),
+            np.array(state),
+            np.array(action),
+            np.array(reward, dtype=np.float32),
+            np.array(done, dtype=np.bool),
+            np.array(next_state),
         )
 
     def reset(self):

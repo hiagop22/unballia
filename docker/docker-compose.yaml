@@ -1,8 +1,0 @@
-version: "3.3"
-services:
-  thunderatz:
-    image: thunderatz/firasim:latest
-    build:
-      context: ../
-      dockerfile: docker/Dockerfile
-    

@@ -1,3 +1,4 @@
 _target_: src.models.A2CAgent
 max_v: 1.5
 max_w: 12.56
+loop_time: 0.02
