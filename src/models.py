@@ -10,9 +10,11 @@ from typing import Tuple, List
 from torch.optim.optimizer import Optimizer
 from torch.utils.data.dataloader import DataLoader
 from .data import Experience, ReplayBuffer
-from .utils import save_onnx, norm_grad
+from .utils import save_onnx, norm_grad, weights_init
 import torch.nn.init as init
 import torch.nn.functional as F
+
+device = torch.device('cuda:0')
 
 class Actor(nn.Module):
     """
@@ -39,16 +41,12 @@ class Actor(nn.Module):
             nn.Sigmoid(),
         )
 
-        # init.xavier_normal_(self.hidden_layers.weight)
-        # init.xavier_normal_(self.mu.weight)
-        # init.xavier_normal_(self.std.weight)
-
     def forward(self, x):
-        x = self.hidden_layers(x.float())
+        x = self.hidden_layers(x)
         means = self.mu(x)
         stds = torch.add(self.std(x), 1e-5)
 
-        return torch.distributions.Normal(means, stds)
+        return means, stds
 
 class Critic(nn.Module):
     def __init__(self, obs_size: int,  activation=nn.ReLU):
@@ -65,7 +63,7 @@ class Critic(nn.Module):
 
     def forward(self, state):
 
-        return self.layers(state.float())
+        return self.layers(state)
         
 
 class Agent:
@@ -91,9 +89,10 @@ class Agent:
         self.state = self.env.reset_random_init_pos()
 
     def get_action(self, net: nn.Module) -> int:        
-        state = torch.tensor([self.process_state.process(self.state)], dtype=torch.float)
-        dists = net(state)
-        action = dists.sample().detach().data.numpy()
+        state = torch.tensor([self.process_state.process(self.state)], dtype=torch.float).to(device)
+        means, stds = net(state)
+        dists = torch.distributions.Normal(means, stds)
+        action = dists.sample().detach().cpu().numpy()
     
         action = np.clip(action, -1, 1)[0]
 
@@ -151,8 +150,11 @@ class PPOStrategy(pl.LightningModule):
 
         self.env = hydra.utils.instantiate(env_conf)
 
-        self.actor = hydra.utils.instantiate(model_conf.actor)
-        self.critic = hydra.utils.instantiate(model_conf.critic)
+        self.actor = hydra.utils.instantiate(model_conf.actor).apply(weights_init)
+        self.actor = self.actor.to(device)
+
+        self.critic = hydra.utils.instantiate(model_conf.critic).apply(weights_init)
+        self.critic = self.critic.to(device)
 
         self.process_state = hydra.utils.instantiate(process_state_conf)
         self.buffer = hydra.utils.instantiate(buffer_conf)
@@ -257,12 +259,11 @@ class PPOStrategy(pl.LightningModule):
 
         states, actions, discounted_rewards, dones, next_states = batch
 
+        # critic
         td_targets = discounted_rewards
         values = self.critic(states)
-        advantage = td_targets - values
 
-        # critic
-        critic_loss = nn.MSELoss()(advantage)
+        critic_loss = nn.MSELoss()(td_targets, values)
         critic_optimizer.zero_grad()
         self.manual_backward(critic_loss)
         norm_grad_critic = norm_grad(self.critic)
@@ -270,11 +271,14 @@ class PPOStrategy(pl.LightningModule):
         critic_optimizer.step()
 
         # actor
-        norm_dists = self.actor(states)
+        advantage = td_targets - values
+        means, stds = self.actor(states)
+        norm_dists = torch.distributions.Normal(means, stds)
         logs_probs = norm_dists.log_prob(actions)
         entropy = norm_dists.entropy().mean()
 
-        actor_loss = (-logs_probs*advantage.detach()).mean() -self.entropy_beta*entropy
+        # actor_loss = (-logs_probs*advantage.detach()).mean()
+        actor_loss = (-logs_probs*advantage.detach()).mean() - entropy*self.entropy_beta
         actor_optimizer.zero_grad()
         self.manual_backward(actor_loss)
         norm_grad_actor = norm_grad(self.actor)
@@ -298,8 +302,8 @@ class PPOStrategy(pl.LightningModule):
         )
 
         output = {
-            'critic_loss': critic_loss.detach().numpy(),
-            'actor_loss': actor_loss.detach().numpy(),
+            'critic_loss': critic_loss.detach().cpu().numpy(),
+            'actor_loss': actor_loss.detach().cpu().numpy(),
             'norm_grad_actor': norm_grad_actor,
             'norm_grad_critic': norm_grad_critic,
         }
@@ -357,12 +361,12 @@ class PPOStrategy(pl.LightningModule):
 
         self.step_schedulers()
 
-        if not self.current_epoch % self.hparams.upload_onnx_sync:
-            self.save_onnx_model()
+        # if not self.current_epoch % self.hparams.upload_onnx_sync:
+        #     self.save_onnx_model()
 
     
-    def save_onnx_model(self):
-        save_onnx(self, self.save_path, self.process_state.state_size)
+    # def save_onnx_model(self):
+    #     save_onnx(self, self.save_path, self.process_state.state_size)
        
     def step_schedulers(self):
         actor_sch, critic_sch = self.lr_schedulers()

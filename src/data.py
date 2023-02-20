@@ -1,5 +1,6 @@
 from collections import deque, namedtuple
 import numpy as np
+import torch
 from .utils import normalized_angle
 from torch.utils import data as tdata
 import math
@@ -182,8 +183,8 @@ class ReplayBuffer(object):
         
         rewards = []
         
-        for i in self.buffer:
-            rewards.append(self.buffer[i].reward)
+        for experience in self.buffer:
+            rewards.append(experience.reward)
 
         rewards = np.array(rewards)
         mean = rewards.mean()
@@ -221,11 +222,11 @@ class RLDataset(tdata.Dataset):
         state, action, reward, done, next_state = self.buffer.getitem(idx)
 
         return (
-            np.array(state),
-            np.array(action),
-            np.array(reward, dtype=np.float32),
-            np.array(done, dtype=np.bool),
-            np.array(next_state),
+            torch.from_numpy(np.array(state)).float(),
+            torch.from_numpy(np.array(action)).float(),
+            torch.from_numpy(np.array([reward], dtype=np.float32)).float(),
+            torch.from_numpy(np.array(done, dtype=np.bool)),
+            torch.from_numpy(np.array(next_state)).float(),
         )
 
     def reset(self):

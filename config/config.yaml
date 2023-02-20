@@ -2,7 +2,7 @@ defaults:
   - _self_
   - optimizer: adam
   - scheduler: ReduceLROnPlateau
-  - trainer: local
+  - trainer: default
   - model: default
   - replaybuffer: default
   - strategy: a2c
@@ -18,6 +18,7 @@ defaults:
 action_size: 2
 project_name: reinforcement_learning
 task_name: ppo
+is_debug: False
 seed: 747
 upload_onnx_sync: 10
 pre_trained: False

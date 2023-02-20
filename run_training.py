@@ -7,6 +7,10 @@ import pytorch_lightning as pl
 
 @hydra.main(version_base='1.2', config_path='config', config_name='config')
 def main(cfg):
+    
+    if cfg.is_debug:
+        cfg.trainer.max_epochs = 5
+        cfg.env.max_time_per_episode = 5
 
     pl.seed_everything(cfg.seed)
 

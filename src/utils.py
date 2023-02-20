@@ -34,8 +34,9 @@ def conv2onnx(model, outpath, size):
     
     w,h = size
     model.eval()
-    x = torch.randn((h, w))
-    
+    device = model.hidden_layers.parameters().device
+    x = torch.randn((h, w)).to(device)
+
     torch.onnx.export(
         model,  # model being run
         x,  # model input (or a tuple for multiple inputs)
@@ -89,3 +90,9 @@ def norm_grad(model):
         total_norm += param_norm.item() ** 2
     total_norm = total_norm ** 0.5
     return total_norm
+
+def weights_init(m):
+    # for every Linear layer in a model..
+    if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+        m.weight.data.normal_(0.0, 0.02)
+        m.bias.data.fill_(0)
