@@ -124,14 +124,14 @@ class MarkovDecisionProcess:
 
     def step(self, actions):
 
-        self.__send_velocities2firasim(actions)
-        firasim_frame = self.__get_firasim_frame()
-        self.__update_entity_properties(firasim_frame)
+        self.send_velocities2firasim(actions)
+        firasim_frame = self.get_firasim_frame()
+        self.update_entity_properties(firasim_frame)
         self.current_step += 1
 
         return (self.process_state(), self.reward(), self.done())
 
-    def __send_velocities2firasim(self, actions):
+    def send_velocities2firasim(self, actions):
         """actions: tuple [[V, W]]"""
         
         tmp_actions = []
@@ -143,7 +143,7 @@ class MarkovDecisionProcess:
         
         self.ally_command.writeMulti(tmp_actions)
 
-    def __get_firasim_frame(self):
+    def get_firasim_frame(self):
         last_packet = None
         
         last_time = time.time()
@@ -160,7 +160,7 @@ class MarkovDecisionProcess:
 
         return last_packet
 
-    def __update_entity_properties(self, message):
+    def update_entity_properties(self, message):
 
         if self.field.team_color == "blue":
             robots = message.frame.robots_blue
@@ -202,13 +202,13 @@ class MarkovDecisionProcess:
     def reset_random_init_pos(self):
         self.init_time = time.time()
 
-        self.__set_entities_positions()
+        self.set_entities_positions()
 
-        self.__send_positions2fira()
+        self.send_positions2fira()
 
         return self.process_state()
 
-    def __set_entities_positions(self):
+    def set_entities_positions(self):
 
         ball_pos = [x(), y()]
 
@@ -218,12 +218,14 @@ class MarkovDecisionProcess:
                     }
 
         min_dist = 0.10
+        max_dist = 0.15
+
         places = KDTree()
         places.insert(ball_pos)
 
         for id in range(self.num_allies_in_field):
             pos = [x(), y()]
-            while places.get_nearest(pos)[1] < min_dist:
+            while places.get_nearest(pos)[1] < min_dist or places.get_nearest(pos)[1] > max_dist:
                 pos = [x(), y()]
 
             places.insert(pos)
@@ -253,7 +255,7 @@ class MarkovDecisionProcess:
 
         self.ball.pos = init_pos["ball"]
 
-    def __send_positions2fira(self):
+    def send_positions2fira(self):
         team_yellow = True if self.field.team_color == "yellow" else False
 
         opponent_command = FIRASimCommand(team_yellow = not team_yellow)
@@ -286,17 +288,20 @@ class MarkovDecisionProcess:
             w_energy = 2e-4
 
             # Calculate ball potential
-            grad_ball_potential = self.__ball_grad()
+            grad_ball_potential = self.ball_grad()
             # Calculate Move ball
-            move_reward = self.__move_reward()
+            move_reward = self.move_reward()
             # Calculate Energy penalty
-            energy_penalty = self.__energy_penalty()
+            energy_penalty = self.energy_penalty()
 
             reward = (  w_move * move_reward + \
                         w_ball_grad * grad_ball_potential + \
                         w_energy * energy_penalty
                         ) 
-            
+            # reward = (  w_ball_grad * grad_ball_potential + \
+            #             w_energy * energy_penalty
+            #             ) 
+
         return reward
 
     def done(self):
@@ -306,7 +311,7 @@ class MarkovDecisionProcess:
             
         return True if abs(self.ball.pos[0]) > abs(self.field.ally_goal_pos[0]) else False
 
-    def __energy_penalty(self):
+    def energy_penalty(self):
 
         energy_penalty = 0
 
@@ -318,7 +323,7 @@ class MarkovDecisionProcess:
 
         return energy_penalty
     
-    def __move_reward(self):
+    def move_reward(self):
         '''
         Cosine between the robot vel vector and the vector robot -> ball.
         This indicates rather the robot is moving towards the ball or not.
@@ -335,7 +340,7 @@ class MarkovDecisionProcess:
         move_reward = np.clip(move_reward / Robot.max_velxy_norm, -1.0, 1.0)
         return move_reward
 
-    def __ball_grad(self):
+    def ball_grad(self):
         '''
         Cosine between the ball vel vector and the vector ball -> goal.
         This indicates rather the ball is moving towards the goal or not.
@@ -352,7 +357,125 @@ class MarkovDecisionProcess:
         move_reward = np.clip(move_reward / Ball.max_velxy_norm, -1.0, 1.0)
         return move_reward
 
-# if __name__ == "__main__":
-#     mdp = MarkovDecisionProcess()
-#     state = mdp.reset_random_init_pos()
-#     print(state)
+class MarkovDecisionProcessV2(MarkovDecisionProcess):
+    """
+    Removing negative rewards
+    """
+    def __init__(self, 
+                 max_time_per_episode: int = 60*5,
+                 team_color: str = "blue",
+                 opponent_color: str = "yellow",
+                 num_allies_in_field: int = 1,
+                 num_opponents_in_field: int = 0,
+                 time_step: float = 0.02
+                 ):
+    
+        super().__init__(
+                    max_time_per_episode = max_time_per_episode,
+                    team_color = team_color,
+                    opponent_color = opponent_color,
+                    num_allies_in_field = num_allies_in_field,
+                    num_opponents_in_field = num_opponents_in_field,
+                    time_step = time_step,
+                    )
+        
+
+    def reward(self):
+        """
+        It's a simplified reward, that give +1 if the agent do a goal and
+        return -1 reward if the agent receive a goal
+        """
+        reward = 0
+
+        # ALLY GOAL SUPOSED TO BEE ALWAYES IN NEGATIVE X
+        
+        if self.ball.pos[0] > self.field.opponent_goal_pos[0]:
+            reward = 0.5*np.exp(10)
+        elif self.ball.pos[0] < self.field.ally_goal_pos[0]:
+            reward = 0.5*np.exp(-10)
+        else:
+
+            w_move = 0.2
+            w_ball_grad = 0.8
+            w_energy = 2e-1
+
+            # Calculate ball potential
+            grad_ball_potential = self.ball_grad()
+            # Calculate Move ball
+            move_reward = self.move_reward()
+            # Calculate Energy penalty
+            energy_penalty = self.energy_penalty()
+
+            reward = (  0.5*np.exp(w_move * move_reward) + \
+                        0.5*np.exp(w_ball_grad * grad_ball_potential) + \
+                        0.5*np.exp(w_energy * energy_penalty)
+                        ) 
+            # reward = (  
+            #             0.5*np.exp(w_ball_grad * grad_ball_potential) + \
+            #             0.5*np.exp(w_energy * energy_penalty)
+            #             ) 
+
+        return reward
+    
+    def energy_penalty(self):
+
+        en_penalty = -abs(self.ally_robots[0].w)
+
+        return en_penalty
+
+
+class MarkovDecisionProcessV3(MarkovDecisionProcess):
+    """
+    Reward function from https://peerj.com/articles/cs-718.pdf, pg 10.
+    """
+    def __init__(self, 
+                 max_time_per_episode: int = 60*5,
+                 team_color: str = "blue",
+                 opponent_color: str = "yellow",
+                 num_allies_in_field: int = 1,
+                 num_opponents_in_field: int = 0,
+                 time_step: float = 0.02
+                 ):
+    
+        super().__init__(
+                    max_time_per_episode = max_time_per_episode,
+                    team_color = team_color,
+                    opponent_color = opponent_color,
+                    num_allies_in_field = num_allies_in_field,
+                    num_opponents_in_field = num_opponents_in_field,
+                    time_step = time_step,
+                    )
+        
+
+    def reward(self):
+        ball_pos = np.array(self.ball.pos)
+        robot_pos = np.array([self.ally_robots[0].pos[0], self.ally_robots[0].pos[1]])
+        robot_ball = ball_pos - robot_pos
+
+        norm_dist_robot_ball = np.linalg.norm(robot_ball)
+
+        ball_velxy = np.array(self.ball.velxy)
+        robot_velxy = np.array(self.ally_robots[0].velxy)
+        vel_robot_ball = ball_velxy - robot_velxy
+        norm_vel_robot_ball = np.linalg.norm(vel_robot_ball)
+
+        reward = np.exp(-norm_dist_robot_ball) + 0.5*np.exp() + 0.5*(1 - np.exp(-norm_vel_robot_ball)) + 50*self.ball_grad()
+
+        return reward
+
+    def ball_grad(self):
+        '''
+        Cosine between the ball vel vector and the vector ball -> goal.
+        This indicates rather the ball is moving towards the goal or not.
+        '''
+
+        ball_pos = np.array(self.ball.pos)
+        opponent_goal_pos = np.array(self.field.opponent_goal_pos)
+        ball_velxy = np.array(self.ball.velxy)
+        ball_opponent_goal = opponent_goal_pos - ball_pos
+        unit_ball_opponent_goal = ball_opponent_goal/np.linalg.norm(ball_opponent_goal)
+
+        move_reward = np.dot(unit_ball_opponent_goal, ball_velxy)
+
+        move_reward = np.clip(move_reward / Ball.max_velxy_norm, -1.0, 1.0)
+        return move_reward

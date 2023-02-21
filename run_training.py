@@ -8,13 +8,16 @@ import pytorch_lightning as pl
 @hydra.main(version_base='1.2', config_path='config', config_name='config')
 def main(cfg):
     
-    if cfg.is_debug:
-        cfg.trainer.max_epochs = 5
-        cfg.env.max_time_per_episode = 5
+    # if cfg.is_debug:
+    #     cfg.trainer.max_epochs = 5
+    #     cfg.env.max_time_per_episode = 5
 
     pl.seed_everything(cfg.seed)
-
-    clearml.Task.init(project_name=cfg.project_name, task_name=cfg.task_name)
+    
+    if cfg.is_debug:
+        clearml.Task.init(project_name=cfg.project_name, task_name=cfg.task_name, auto_connect_frameworks={'pytorch': False})
+    else:
+        clearml.Task.init(project_name=cfg.project_name, task_name=cfg.task_name)
 
     if os.path.isdir(cfg.logdir):
         shutil.rmtree(cfg.logdir)
@@ -24,14 +27,15 @@ def main(cfg):
     callbacks = [
         pl.callbacks.LearningRateMonitor(),
         pl.callbacks.ModelCheckpoint(
-            dirpath=logger.save_dir,
-            filename='best-model',
-            save_last=True,
-            verbose=True,
-            monitor=cfg.watch_metric.actor.watch_metric,
-            mode=cfg.watch_metric.actor.watch_metric_mode,
-        )
+                dirpath=logger.save_dir,
+                filename='best-model',
+                save_last=True,
+                verbose=True,
+                monitor=cfg.watch_metric.actor.watch_metric,
+                mode=cfg.watch_metric.actor.watch_metric_mode,
+            )
     ]
+        
 
     strategy_model = hydra.utils.instantiate(
         cfg.strategy,
@@ -48,7 +52,7 @@ def main(cfg):
         save_path=logger.save_dir,
         _recursive_=False,
         )
-        
+    
     # if cfg.pre_trained:
     #     task = clearml.Task.get_task(task_id=cfg.pre_trained_id)
     #     list_model = task.get_models()["output"][-1]
@@ -61,12 +65,14 @@ def main(cfg):
     #                                                     else 'cpu'))['state_dict'])
     
     trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks)
+
     try: 
         trainer.fit(strategy_model)
     except KeyboardInterrupt:
         print('KeyboardInterrupt raised.')
     finally:
-        save_onnx(strategy_model, logger.save_dir, cfg.process_state.state_size)
+        if not cfg.is_debug:
+            save_onnx(strategy_model, logger.save_dir, cfg.process_state.state_size)
         
 if __name__ == '__main__':
     main()

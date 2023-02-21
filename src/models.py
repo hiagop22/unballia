@@ -10,9 +10,7 @@ from typing import Tuple, List
 from torch.optim.optimizer import Optimizer
 from torch.utils.data.dataloader import DataLoader
 from .data import Experience, ReplayBuffer
-from .utils import save_onnx, norm_grad, weights_init
-import torch.nn.init as init
-import torch.nn.functional as F
+from .utils import norm_grad, weights_init, Mish
 
 device = torch.device('cuda:0')
 
@@ -22,7 +20,7 @@ class Actor(nn.Module):
         obs_size: observation/state size of the environment
         n_actions: number of discrete actions available in the environment = (V,W)
     """
-    def __init__(self, obs_size: int, n_actions: int, activation=nn.ReLU):
+    def __init__(self, obs_size: int, n_actions: int, activation=Mish):
         super().__init__()
         self.hidden_layers = nn.Sequential(
             nn.Linear(obs_size, 512),
@@ -49,7 +47,7 @@ class Actor(nn.Module):
         return means, stds
 
 class Critic(nn.Module):
-    def __init__(self, obs_size: int,  activation=nn.ReLU):
+    def __init__(self, obs_size: int,  activation=Mish):
 
         super().__init__()
         
@@ -173,8 +171,7 @@ class PPOStrategy(pl.LightningModule):
         self.watch_metric = watch_metric
         
         self.gamma = gamma
-        # self.entropy_beta = entropy_beta
-        self.entropy_beta = 0
+        self.entropy_beta = entropy_beta
         self.max_grad_norm = max_grad_norm
         self.tau = tau
         self.upload_onnx_sync = upload_onnx_sync
@@ -192,6 +189,7 @@ class PPOStrategy(pl.LightningModule):
             'val_reward',
             episode_reward,
             on_epoch=True,
+            on_step=False,
             prog_bar=False,
             logger=True
         )
@@ -267,38 +265,62 @@ class PPOStrategy(pl.LightningModule):
         critic_optimizer.zero_grad()
         self.manual_backward(critic_loss)
         norm_grad_critic = norm_grad(self.critic)
-        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), self.hparams.max_grad_norm.critic)
+        # torch.nn.utils.clip_grad_norm_(self.critic.parameters(), self.hparams.max_grad_norm.critic)
         critic_optimizer.step()
 
         # actor
         advantage = td_targets - values
         means, stds = self.actor(states)
         norm_dists = torch.distributions.Normal(means, stds)
-        logs_probs = norm_dists.log_prob(actions)
+        log_probs = norm_dists.log_prob(actions)
         entropy = norm_dists.entropy().mean()
 
         # actor_loss = (-logs_probs*advantage.detach()).mean()
-        actor_loss = (-logs_probs*advantage.detach()).mean() - entropy*self.entropy_beta
+        actor_loss = (-log_probs*advantage.detach()).mean() - entropy*self.entropy_beta
         actor_optimizer.zero_grad()
         self.manual_backward(actor_loss)
         norm_grad_actor = norm_grad(self.actor)
-        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), self.hparams.max_grad_norm.actor)
+        # torch.nn.utils.clip_grad_norm_(self.actor.parameters(), self.hparams.max_grad_norm.actor)
         actor_optimizer.step()
 
         self.log(
             'actor_loss',
             actor_loss,
-            on_step=True,
-            on_epoch=False,
-            prog_bar=True,
-        )
-        
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
+        )        
+
         self.log(
             'critic_loss',
             critic_loss,
-            on_step=True,
-            on_epoch=False,
-            prog_bar=True,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
+        )
+
+        self.log(
+            'norm_grad_actor',
+            norm_grad_actor,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
+        )
+
+        self.log(
+            'norm_grad_critic',
+            norm_grad_critic,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
+        )
+        
+        self.log(
+            'entropy',
+            entropy,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
         )
 
         output = {
@@ -311,43 +333,43 @@ class PPOStrategy(pl.LightningModule):
         return output
 
     def training_epoch_end(self, training_step_outputs):
-        critic_loss_step = [out['critic_loss'] for out in training_step_outputs]
-        actor_loss_step = [out['actor_loss'] for out in training_step_outputs]
-        norm_grad_actor = [out['norm_grad_actor'] for out in training_step_outputs]
-        norm_grad_critic = [out['norm_grad_critic'] for out in training_step_outputs]
+        # critic_loss_step = [out['critic_loss'] for out in training_step_outputs]
+        # actor_loss_step = [out['actor_loss'] for out in training_step_outputs]
+        # norm_grad_actor = [out['norm_grad_actor'] for out in training_step_outputs]
+        # norm_grad_critic = [out['norm_grad_critic'] for out in training_step_outputs]
         
-        avg_critic_loss = mean(critic_loss_step)
-        avg_actor_loss = mean(actor_loss_step)
-        avg_norm_grad_actor = mean(norm_grad_actor)
-        avg_norm_grad_critic = mean(norm_grad_critic)
+        # avg_critic_loss = mean(critic_loss_step)
+        # avg_actor_loss = mean(actor_loss_step)
+        # avg_norm_grad_actor = mean(norm_grad_actor)
+        # avg_norm_grad_critic = mean(norm_grad_critic)
         
-        self.log('avg_critic_epoch_loss', 
-                avg_critic_loss, 
-                on_epoch=True, 
-                prog_bar=True,
-                logger=True,
-            )
+        # self.log('avg_critic_epoch_loss', 
+        #         avg_critic_loss, 
+        #         on_epoch=True, 
+        #         prog_bar=True,
+        #         logger=True,
+        #     )
 
-        self.log('avg_actor_epoch_loss', 
-                avg_actor_loss, 
-                on_epoch=True, 
-                prog_bar=True,
-                logger=True,
-            )
+        # self.log('avg_actor_epoch_loss', 
+        #         avg_actor_loss, 
+        #         on_epoch=True, 
+        #         prog_bar=True,
+        #         logger=True,
+        #     )
 
-        self.log('avg_norm_grad_actor', 
-                avg_norm_grad_actor, 
-                on_epoch=True, 
-                prog_bar=True,
-                logger=True,
-            )
+        # self.log('avg_norm_grad_actor', 
+        #         avg_norm_grad_actor, 
+        #         on_epoch=True, 
+        #         prog_bar=True,
+        #         logger=True,
+        #     )
 
-        self.log('avg_norm_grad_critic', 
-                avg_norm_grad_critic, 
-                on_epoch=True, 
-                prog_bar=True,
-                logger=True,
-            )
+        # self.log('avg_norm_grad_critic', 
+        #         avg_norm_grad_critic, 
+        #         on_epoch=True, 
+        #         prog_bar=True,
+        #         logger=True,
+        #     )
 
         val_reward = self.agent.play_episode(self.actor, self.gamma)
 

@@ -13,7 +13,7 @@ defaults:
   - agent: default
   - test: default
   - process_state: absolute
-  - env: FiraSim
+  - env: ExpRewards
 
 action_size: 2
 project_name: reinforcement_learning

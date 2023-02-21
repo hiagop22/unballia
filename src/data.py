@@ -180,21 +180,23 @@ class ReplayBuffer(object):
 
     def normalize_rewards(self, gamma: float):
         discounted_r = 0
+        disc_vector = []
         
-        rewards = []
-        
-        for experience in self.buffer:
-            rewards.append(experience.reward)
+        for experience in reversed(self.buffer):
+            discounted_r = discounted_r * gamma + experience.reward
+            disc_vector.append(discounted_r)
 
-        rewards = np.array(rewards)
-        mean = rewards.mean()
-        std = rewards.std() + 1e-5
+        disc_vector = np.array(disc_vector)
+        mean = disc_vector.mean()
+        std = disc_vector.std() + 1e-5
 
+        discounted_r = 0
         for state, action, reward, done, new_state in reversed(self.buffer):
-            discounted_r = discounted_r * gamma + ((reward - mean) / std)
+            discounted_r = discounted_r * gamma + reward
+            
+            self.memory.append((state, action, (discounted_r - mean) / std, done, new_state))     
 
-            self.memory.append((state, action, discounted_r, done, new_state))     
-
+        
     def getitem(self, idx):
         return self.memory[idx]
 

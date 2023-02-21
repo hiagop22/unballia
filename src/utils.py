@@ -34,7 +34,7 @@ def conv2onnx(model, outpath, size):
     
     w,h = size
     model.eval()
-    device = model.hidden_layers.parameters().device
+    device = next(model.hidden_layers.parameters()).device
     x = torch.randn((h, w)).to(device)
 
     torch.onnx.export(
