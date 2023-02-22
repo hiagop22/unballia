@@ -1,8 +1,8 @@
 actor:
-  _target_: src.models.Actor
+  _target_: src.models.PPOActor
   obs_size: ${process_state.state_size}
   n_actions: ${action_size}
 
 critic:
-  _target_: src.models.Critic
+  _target_: src.models.PPOCritic
   obs_size: ${process_state.state_size}

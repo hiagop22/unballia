@@ -3,7 +3,7 @@ defaults:
   - optimizer: adam
   - scheduler: ReduceLROnPlateau
   - trainer: default
-  - model: default
+  - model: ppo
   - replaybuffer: default
   - strategy: ppo
   - dataset: default

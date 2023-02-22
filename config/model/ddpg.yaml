@@ -1,0 +1,9 @@
+actor:
+  _target_: src.models.DDPGActor
+  obs_size: ${process_state.state_size}
+  n_actions: ${action_size}
+
+critic:
+  _target_: src.models.DDPGCritic
+  obs_size: ${process_state.state_size}
+  n_actions: ${action_size}
