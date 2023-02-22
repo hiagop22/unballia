@@ -97,8 +97,13 @@ class MarkovDecisionProcess:
                  opponent_color: str = "yellow",
                  num_allies_in_field: int = 1,
                  num_opponents_in_field: int = 0,
-                 time_step: float = 0.02
+                 time_step: float = 0.02,
+                 min_dist: float = 0.10,
+                 max_dist: float = 0.15,
                  ):
+
+        self.min_dist = min_dist
+        self.max_dist = max_dist
 
         self.num_allies_in_field = num_allies_in_field
         self.num_opponents_in_field = num_opponents_in_field
@@ -183,13 +188,15 @@ class MarkovDecisionProcess:
         
         for id in range(self.num_allies_in_field):
             state['ally'][id] = { 'pos_xy': np.array([self.ally_robots[id].pos[0],self.ally_robots[id].pos[1]]), 
-                                   'theta': self.ally_robots[id].pos[2], 
+                                   'theta': self.ally_robots[id].pos[2] if self.ally_robots[id].pos[2] > np.pi 
+                                            else self.ally_robots[id].pos[2] - 2*np.pi, 
                                    'vel_xy': np.array(self.ally_robots[id].velxy),
                                    'w': self.ally_robots[id].w}
 
         for id in range(self.num_opponents_in_field):
             state['opponent'][id] = { 'pos_xy': np.array([self.opponent_robots[id].pos[0],self.opponent_robots[id].pos[1]]), 
-                                      'theta': self.opponent_robots[id].pos[2], 
+                                      'theta': self.opponent_robots[id].pos[2] if self.opponent_robots[id].pos[2] > np.pi
+                                                else self.opponent_robots[id].pos[2] - 2*np.pi, 
                                       'vel_xy': np.array(self.opponent_robots[id].velxy),
                                       'w': self.opponent_robots[id].w}
         
@@ -217,15 +224,12 @@ class MarkovDecisionProcess:
                     "opponents": [],
                     }
 
-        min_dist = 0.10
-        max_dist = 0.15
-
         places = KDTree()
         places.insert(ball_pos)
 
         for id in range(self.num_allies_in_field):
             pos = [x(), y()]
-            while places.get_nearest(pos)[1] < min_dist or places.get_nearest(pos)[1] > max_dist:
+            while places.get_nearest(pos)[1] < self.min_dist or places.get_nearest(pos)[1] > self.max_dist:
                 pos = [x(), y()]
 
             places.insert(pos)
@@ -237,7 +241,7 @@ class MarkovDecisionProcess:
 
         for _ in range(self.num_opponents_in_field):
             pos = [x(), y()]
-            while places.get_nearest(pos)[1] < min_dist:
+            while places.get_nearest(pos)[1] < self.min_dist:
                 pos = [x(), y()]
 
             places.insert(pos)
@@ -390,9 +394,9 @@ class MarkovDecisionProcessV2(MarkovDecisionProcess):
         # ALLY GOAL SUPOSED TO BEE ALWAYES IN NEGATIVE X
         
         if self.ball.pos[0] > self.field.opponent_goal_pos[0]:
-            reward = 0.5*np.exp(10)
+            reward = 0.5*np.exp(6.5)
         elif self.ball.pos[0] < self.field.ally_goal_pos[0]:
-            reward = 0.5*np.exp(-10)
+            reward = 0.5*np.exp(-6.5)
         else:
 
             w_move = 0.2

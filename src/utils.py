@@ -7,16 +7,6 @@ import clearml
 import numpy as np
 from clearml import Task
 
-class Mish(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, x):
-        return self.mish(x)
-
-    def mish(self, input):
-        return input * torch.tanh(F.softplus(input))
-
 def save_onnx(model, save_path, state_size: int):
     try: 
         # model = raw_model.clone()

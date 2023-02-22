@@ -1,3 +1,0 @@
-_target_: src.data.ProcessStateV3
-state_size: 22
-max_w: ${agent.max_w}

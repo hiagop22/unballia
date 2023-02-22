@@ -49,20 +49,8 @@ def main(cfg):
         dataloader_conf=cfg.dataloader,
         process_state_conf=cfg.process_state,
         watch_metric=cfg.watch_metric,
-        save_path=logger.save_dir,
         _recursive_=False,
         )
-    
-    # if cfg.pre_trained:
-    #     task = clearml.Task.get_task(task_id=cfg.pre_trained_id)
-    #     list_model = task.get_models()["output"][-1]
-    #     ckpt_path = str(list_model.get_local_copy())
-
-    #     while not ckpt_path.endswith('last.ckpt'):
-    #         ckpt_path = str(list_model.get_local_copy())
-
-    #     strategy_model.load_state_dict(torch.load(ckpt_path, map_location=torch.device('cuda' if torch.cuda.is_available() 
-    #                                                     else 'cpu'))['state_dict'])
     
     trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks)
 

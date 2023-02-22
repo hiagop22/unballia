@@ -5,21 +5,17 @@ defaults:
   - trainer: default
   - model: default
   - replaybuffer: default
-  - strategy: a2c
+  - strategy: ppo
   - dataset: default
   - dataloader: default
   - watch_metric: default
-  - onnx: default
-  - agent: default
-  - test: default
-  - process_state: absolute
-  - env: ExpRewards
+  - agent: ppo
+  - process_state: relative
+  - env: ExponentialRewards
 
 action_size: 2
 project_name: reinforcement_learning
 task_name: ppo
 is_debug: False
 seed: 747
-upload_onnx_sync: 10
-pre_trained: False
 logdir: ./outputs
