@@ -1,10 +1,10 @@
-import time
-from numpy.core.fromnumeric import mean
 import pytorch_lightning as pl
 import torch
 from torch import nn, Tensor
 from omegaconf import DictConfig
 import hydra
+import random
+from noise import OUNoise
 import numpy as np
 from typing import Tuple, List
 from torch.optim.optimizer import Optimizer
@@ -29,7 +29,7 @@ class ResidualBlock(nn.Module):
         return x + self.block(x)
 
 
-class Actor(nn.Module):
+class PPOActor(nn.Module):
     """
     Args:
         obs_size: observation/state size of the environment
@@ -62,7 +62,30 @@ class Actor(nn.Module):
 
         return means, stds
 
-class Critic(nn.Module):
+class DDPGActor(nn.Module):
+    """
+    Args:
+        obs_size: observation/state size of the environment
+        n_actions: number of discrete actions available in the environment = (V,W)
+    """
+    def __init__(self, obs_size: int, n_actions: int, activation=nn.Mish):
+        super().__init__()
+        self.layers = nn.Sequential(
+            nn.Linear(obs_size, 512),
+            activation(),
+            ResidualBlock(hidden_size=512, activation=activation),
+            ResidualBlock(hidden_size=512, activation=activation),
+            nn.Linear(obs_size, n_actions),
+            nn.Tanh(),
+            )
+
+    def forward(self, x):
+        x = self.layers(x)
+
+        return x
+
+
+class PPOCritic(nn.Module):
     def __init__(self, obs_size: int,  activation=nn.Mish):
 
         super().__init__()
@@ -77,6 +100,25 @@ class Critic(nn.Module):
     def forward(self, state):
 
         return self.layers(state)
+        
+class DDPGCritic(nn.Module):
+    def __init__(self, obs_size: int,  n_actions: int, activation=nn.Mish):
+
+        super().__init__()
+        
+        self.layers = nn.Sequential(
+            nn.Linear(obs_size+n_actions, 512),
+            activation(),
+            ResidualBlock(512, activation=activation),
+            ResidualBlock(512, activation=activation),
+            nn.Linear(512, n_actions),
+        )
+
+    def forward(self, state, action):
+        x = torch.cat([state, action], 1)
+        x = self.layers(state)
+        
+        return x
         
 
 class Agent(ABC):
@@ -169,6 +211,7 @@ class Strategy(pl.LightningModule):
         watch_metric,
         max_grad_norm: DictConfig,
         gamma: float,
+        sync_max_dist_update:int,
     ):
         
         super().__init__()
@@ -202,6 +245,8 @@ class Strategy(pl.LightningModule):
         
         self.gamma = gamma
         self.max_grad_norm = max_grad_norm
+
+        self.sync_max_dist_update = sync_max_dist_update
 
     def initially_fill_buffer(self) -> None:
         """Carries out several one entire episode in the environment to initially fill up the replay buffer with
@@ -252,7 +297,7 @@ class Strategy(pl.LightningModule):
 
     def training_epoch_end(self, training_step_outputs):
 
-        if not self.current_epoch % 500 and not self.current_epoch and self.env.max_dist < 0.75:
+        if not self.current_epoch % self.sync_max_dist_update and not self.current_epoch and self.env.max_dist < 0.75:
             self.env.max_dist += 0.10
 
         val_reward = self.agent.play_episode(self.actor, self.gamma)
@@ -476,6 +521,17 @@ class DDPGStrategy(Strategy):
         self.tau = tau
         self.entropy_beta = entropy_beta
 
+        self.target_actor = hydra.utils.instantiate(model_conf.actor).apply(weights_init)
+        self.target_actor = self.target_actor.to(device)
+
+        self.target_critic = hydra.utils.instantiate(model_conf.critic).apply(weights_init)
+        self.target_critic = self.target_critic.to(device)
+
+        for target_param, param in zip(self.target_actor.parameters(), self.actor.parameters()):
+            target_param.data.copy_(param.data)
+        for target_param, param in zip(self.target_critic.parameters(), self.critic.parameters()):
+            target_param.data.copy_(param.data)
+
         self.initially_fill_buffer()
 
     def forward(self, x: Tensor) -> Tensor:
@@ -487,9 +543,9 @@ class DDPGStrategy(Strategy):
         Returns:
             continuous v,w unnormalized. 
         """
-        norm_dists = self.actor(x)
+        actions = self.actor(x)
 
-        return norm_dists
+        return actions
     
 
     def training_step(self, batch: Tuple[Tensor, Tensor], batch_idx):
@@ -507,13 +563,16 @@ class DDPGStrategy(Strategy):
         # calculates training loss
         actor_optimizer, critic_optimizer = self.optimizers()
 
-        states, actions, discounted_rewards, dones, next_states = batch
+        states, actions, rewards, dones, next_states = batch
 
         # critic
-        td_targets = discounted_rewards
-        values = self.critic(states)
+        q_values = self.critic(states, actions)
+        next_actions = self.target_actor(next_states)
+        next_q = self.target_critic(next_states, next_actions)
 
-        critic_loss = nn.MSELoss()(td_targets, values)
+        q_targets = rewards + self.gamma * next_q
+
+        critic_loss = nn.MSELoss()(q_targets, q_values)
         critic_optimizer.zero_grad()
         self.manual_backward(critic_loss)
         norm_grad_critic = norm_grad(self.critic)
@@ -521,14 +580,7 @@ class DDPGStrategy(Strategy):
         critic_optimizer.step()
 
         # actor
-        advantage = td_targets - values
-        means, stds = self.actor(states)
-        norm_dists = torch.distributions.Normal(means, stds)
-        log_probs = norm_dists.log_prob(actions)
-        entropy = norm_dists.entropy().mean()
-
-        # actor_loss = (-logs_probs*advantage.detach()).mean()
-        actor_loss = (-log_probs*advantage.detach()).mean() - entropy*self.entropy_beta
+        actor_loss = -self.critic(states, self.actor(states)).mean()
         actor_optimizer.zero_grad()
         self.manual_backward(actor_loss)
         norm_grad_actor = norm_grad(self.actor)
@@ -583,3 +635,18 @@ class DDPGStrategy(Strategy):
         }
 
         return output
+    
+
+    def training_epoch_end(self, training_step_outputs):
+
+        super().training_epoch_end(training_step_outputs)
+
+        self.update_target_networks()
+
+    def update_target_networks(self):
+
+        for target_param, param in zip(self.target_actor.parameters(), self.actor.parameters()):
+            target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
+       
+        for target_param, param in zip(self.target_critic.parameters(), self.critic.parameters()):
+            target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
