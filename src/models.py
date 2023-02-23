@@ -3,8 +3,7 @@ import torch
 from torch import nn, Tensor
 from omegaconf import DictConfig
 import hydra
-import random
-from noise import OUNoise
+from src.noise import OUNoise
 import numpy as np
 from typing import Tuple, List
 from torch.optim.optimizer import Optimizer
@@ -75,7 +74,7 @@ class DDPGActor(nn.Module):
             activation(),
             ResidualBlock(hidden_size=512, activation=activation),
             ResidualBlock(hidden_size=512, activation=activation),
-            nn.Linear(obs_size, n_actions),
+            nn.Linear(512, n_actions),
             nn.Tanh(),
             )
 
@@ -116,7 +115,7 @@ class DDPGCritic(nn.Module):
 
     def forward(self, state, action):
         x = torch.cat([state, action], 1)
-        x = self.layers(state)
+        x = self.layers(x)
         
         return x
         
@@ -147,28 +146,9 @@ class Agent(ABC):
     def get_action(self, net: nn.Module) -> int:        
         pass
     
-    @torch.no_grad()
+    @abstractmethod
     def play_episode(self, net: nn.Module, gamma: float) -> float:
-        episode_reward = 0.0
-        self.reset()
-        done = False
-        
-        while not done:
-            action = self.get_action(net)
-            env_action = np.reshape(action, (-1,2))
-            env_action[0] = env_action[0]*np.array([self.max_v,self.max_w])
-            
-            new_state, reward, done = self.env.step(env_action)
-            exp = Experience(self.process_state.process(self.state), action, reward, done, self.process_state.process(new_state))
-
-            self.replay_buffer.append(exp)
-            self.state = new_state
-            episode_reward += reward
-
-        self.replay_buffer.append(exp)
-        self.replay_buffer.normalize_rewards(gamma)
-
-        return episode_reward
+        pass
     
 class PPOAgent(Agent):
     """Base agent class handeling the interaction with the environment"""
@@ -194,7 +174,93 @@ class PPOAgent(Agent):
         action = np.clip(action, -1, 1)[0]
 
         return action
+
+    @torch.no_grad()
+    def play_episode(self, net: nn.Module, gamma: float) -> float:
+        episode_reward = 0.0
+        self.reset()
+        done = False
+        
+        while not done:
+            action = self.get_action(net)
+            env_action = np.reshape(action, (-1,2))
+            env_action[0] = env_action[0]*np.array([self.max_v,self.max_w])
+            
+            new_state, reward, done = self.env.step(env_action)
+            exp = Experience(self.process_state.process(self.state), action, reward, done, self.process_state.process(new_state))
+
+            self.replay_buffer.append(exp)
+            self.state = new_state
+            episode_reward += reward
+
+        self.replay_buffer.append(exp)
+        self.replay_buffer.normalize_rewards(gamma)
+
+        return episode_reward
+
+class DDPGAgent(Agent):
+    """Base agent class handeling the interaction with the environment"""
+    """
+    Args:
+        env: training environment
+        replay_buffer: replay buffer storing experiences
+    """
+    def __init__(self, env, replay_buffer: ReplayBuffer, process_state, max_v: float, max_w: float):
+        
+        super().__init__(env, replay_buffer, process_state, max_v, max_w)
+        self.reset()
+        
+    def reset(self) -> None:
+        # self.replay_buffer.reset()
+        self.state = self.env.reset_random_init_pos()
+        self.episode_reward = 0.0
+        self.done = False
+
+    def get_action(self, net: nn.Module) -> int:        
+        state = torch.tensor([self.process_state.process(self.state)], dtype=torch.float).to(device)
+        action = net(state)
+        print("actions")
+        print(action)
+
+        action = action.detach().cpu().numpy()
+        action = np.clip(action, -1, 1)[0]
+
+        return action
     
+    @torch.no_grad()
+    def play_episode(self, net: nn.Module, gamma: float, store_exp: bool = True) -> float:
+        self.reset()
+        
+        action_space = 2
+        noise = OUNoise(action_space)
+
+        episode_reward = 0
+        step = 0
+        done = False
+
+        while not done:
+            action = self.get_action(net)
+            env_action = np.reshape(action, (-1,2))
+
+            env_action[0] = noise.get_action(env_action[0], step)
+            env_action[0] = env_action[0]*np.array([self.max_v,self.max_w])
+            
+            new_state, reward, done = self.env.step(env_action)
+
+            if store_exp:
+                exp = Experience(self.process_state.process(self.state), action, reward, done, self.process_state.process(new_state))
+                self.replay_buffer.append(exp)
+
+            self.state = new_state
+            episode_reward += reward
+            
+            step += 1
+
+        if store_exp:
+            self.replay_buffer.append(exp)
+            self.replay_buffer.normalize_rewards(gamma)
+
+        return episode_reward
     
 class Strategy(pl.LightningModule):
     def __init__(
@@ -252,16 +318,7 @@ class Strategy(pl.LightningModule):
         """Carries out several one entire episode in the environment to initially fill up the replay buffer with
         experiences.
         """
-        episode_reward = self.agent.play_episode(self.actor, self.gamma)
-
-        self.log(
-            'val_reward',
-            episode_reward,
-            on_epoch=True,
-            on_step=False,
-            prog_bar=False,
-            logger=True
-        )
+        self.agent.play_episode(self.actor, self.gamma)
     
     def configure_optimizers(self) -> List[Optimizer]:
         actor_optimizer = hydra.utils.instantiate(
@@ -356,6 +413,7 @@ class PPOStrategy(Strategy):
         max_grad_norm: DictConfig,
         entropy_beta: float,
         gamma: float,
+        sync_max_dist_update: int,
     ):
 
         super().__init__(
@@ -371,6 +429,7 @@ class PPOStrategy(Strategy):
                         watch_metric = watch_metric,
                         max_grad_norm = max_grad_norm,
                         gamma = gamma,
+                        sync_max_dist_update = sync_max_dist_update,
                         )
 
         self.entropy_beta = entropy_beta
@@ -498,9 +557,9 @@ class DDPGStrategy(Strategy):
         process_state_conf: DictConfig, 
         watch_metric,
         max_grad_norm: DictConfig,
-        entropy_beta: float,
         gamma: float,
         tau: float,
+        sync_max_dist_update: int,
     ):
 
         super().__init__(
@@ -516,10 +575,10 @@ class DDPGStrategy(Strategy):
                         watch_metric = watch_metric,
                         max_grad_norm = max_grad_norm,
                         gamma = gamma,
+                        sync_max_dist_update = sync_max_dist_update,
                         )
 
         self.tau = tau
-        self.entropy_beta = entropy_beta
 
         self.target_actor = hydra.utils.instantiate(model_conf.actor).apply(weights_init)
         self.target_actor = self.target_actor.to(device)
@@ -546,7 +605,6 @@ class DDPGStrategy(Strategy):
         actions = self.actor(x)
 
         return actions
-    
 
     def training_step(self, batch: Tuple[Tensor, Tensor], batch_idx):
         """Carries out a single step through the environment to update the replay buffer. Then calculates loss
@@ -614,14 +672,6 @@ class DDPGStrategy(Strategy):
         self.log(
             'norm_grad_critic',
             norm_grad_critic,
-            on_step=False,
-            on_epoch=True,
-            prog_bar=False,
-        )
-        
-        self.log(
-            'entropy',
-            entropy,
             on_step=False,
             on_epoch=True,
             prog_bar=False,

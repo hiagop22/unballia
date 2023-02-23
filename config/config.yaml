@@ -3,19 +3,19 @@ defaults:
   - optimizer: adam
   - scheduler: ReduceLROnPlateau
   - trainer: default
-  - model: ppo
+  - model: ddpg
   - replaybuffer: default
-  - strategy: ppo
+  - strategy: ddpg
   - dataset: default
   - dataloader: default
   - watch_metric: default
-  - agent: ppo
+  - agent: ddpg
   - process_state: relative
-  - env: ExponentialRewards
+  - env: FiraSimRewards
 
 action_size: 2
 project_name: reinforcement_learning
-task_name: ppo
+task_name: ddpg
 is_debug: False
 seed: 747
 logdir: ./outputs

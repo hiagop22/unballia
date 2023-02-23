@@ -1,6 +1,7 @@
 from collections import deque, namedtuple
 import numpy as np
 import torch
+import random
 from .utils import normalized_angle, angle_between
 from torch.utils import data as tdata
 import math
@@ -208,3 +209,38 @@ class RLDataset(tdata.Dataset):
 
     def reset(self):
         self.buffer.reset()
+
+# class DDPGDataset(tdata.Dataset):
+#     """Iterable Dataset containing the ExperienceBuffer which will be used with the new experiences
+#     during training
+    
+#     Args:
+#         buffer: replay buffer
+#         sample_size: number of experiences to sample at a time
+#     """
+
+#     def __init__(self, len: int, buffer: ReplayBuffer, gamma: float=0.9) -> None:
+#         self.buffer = buffer
+#         self.gamma = gamma
+
+#         self.len = len
+
+#     def __len__(self):
+#         return self.len
+#         # return len(self.buffer.memory)
+
+#     def __getitem__(self, idx):
+#         idx = random.randint(0, len(self.buffer.memory))
+
+#         state, action, reward, done, next_state = self.buffer.getitem(idx)
+
+#         return (
+#             torch.from_numpy(np.array(state)).float(),
+#             torch.from_numpy(np.array(action)).float(),
+#             torch.from_numpy(np.array([reward], dtype=np.float32)).float(),
+#             torch.from_numpy(np.array(done, dtype=np.bool)),
+#             torch.from_numpy(np.array(next_state)).float(),
+#         )
+
+#     def reset(self):
+#         self.buffer.reset()
