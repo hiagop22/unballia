@@ -13,19 +13,22 @@ def report2clearml(task, training_step_outputs, idx):
     buffer = defaultdict(list)
     
     for out in training_step_outputs:
-        for key, val in out:
+        for key, val in out.items():
             buffer[key].append(val)
 
-    for key, list_val in buffer:
+    avg_buffer = dict()
+
+    for key, list_val in buffer.items():
         avg_value = mean(list_val)
+        avg_buffer[key] = avg_value
 
         task.get_logger().report_scalar(key, key, value=avg_value, iteration=idx)
 
+    return avg_buffer
 
 @hydra.main(version_base='1.2', config_path='config', config_name='config')
 def main(cfg):
 
-    pl.seed_everything(cfg.seed)
     pl.seed_everything(cfg.seed)
     
     if cfg.is_debug:
@@ -52,25 +55,21 @@ def main(cfg):
     env = hydra.utils.instantiate(cfg.env)
 
     agent = hydra.utils.instantiate(
-        cfg.strategy,
-        env_conf=cfg.env,
+        cfg.agent,
         model_conf=cfg.model,
         memory_conf=cfg.memory,
         optimizer_conf=cfg.optimizer,
         scheduler_conf=cfg.scheduler,
-        dataset_conf=cfg.dataset,
-        dataloader_conf=cfg.dataloader,
         process_state_conf=cfg.process_state,
-        watch_metric=cfg.watch_metric,
         _recursive_=False,
         )
     
     try: 
-        for epoch in cfg.max_epochs:
+        for epoch in range(cfg.max_epochs):
             training_step_outputs = []
             done = False
 
-            noise = OUNoise(cfg.action_space)
+            noise = OUNoise(cfg.action_size)
             episode_reward = 0
 
             state = env.reset_random_init_pos()
@@ -94,12 +93,23 @@ def main(cfg):
                 state = new_state
                 step += 1
                 episode_reward += reward
-            
-            report2clearml(task, training_step_outputs, epoch)
+
+                
+            if not epoch % cfg.sync_max_dist_update and not epoch and env.max_dist < 0.75:
+                env.max_dist += 0.10
+
+            avg_values = report2clearml(task, training_step_outputs, epoch)
+            agent.step_schedulers(actor_loss=avg_values["actor_loss"], critic_loss=avg_values["critic_loss"])
 
             task.get_logger().report_scalar("reward", 
                                             "reward", 
                                             value=episode_reward, 
+                                            iteration=epoch,
+                                            )
+            
+            task.get_logger().report_scalar("epoch", 
+                                            "epoch", 
+                                            value=epoch, 
                                             iteration=epoch,
                                             )
 

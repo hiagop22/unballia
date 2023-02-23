@@ -2,11 +2,10 @@ import torch
 from torch import nn
 from omegaconf import DictConfig
 import hydra
-from src.noise import OUNoise
 import numpy as np
 from typing import List
 from torch.optim.optimizer import Optimizer
-from .data import Experience, ReplayBuffer
+from .data import Experience
 from .utils import norm_grad, weights_init
 
 device = torch.device('cuda:0')
@@ -64,103 +63,7 @@ class DDPGCritic(nn.Module):
         x = self.layers(x)
         
         return x
-        
-
-class DDPGAgent(object):
-    """Base agent class handeling the interaction with the environment"""
-    """
-    Args:
-        env: training environment
-        replay_buffer: replay buffer storing experiences
-    """
-    def __init__(self, env, replay_buffer: ReplayBuffer, process_state, max_v: float, max_w: float):
-        
-        self.env = env
-        self.replay_buffer = replay_buffer
-        self.process_state = process_state
-        
-        self.max_v = max_v
-        self.max_w = max_w
-
-        self.reset()
-        
-    def reset(self) -> None:
-        # self.replay_buffer.reset()
-        self.state = self.env.reset_random_init_pos()
-        self.episode_reward = 0.0
-        self.done = False
-    
-    @torch.no_grad()
-    def play_episode(self, net: nn.Module, gamma: float, store_exp: bool = True) -> float:
-        self.reset()
-        
-        action_space = 2
-        noise = OUNoise(action_space)
-
-        episode_reward = 0
-        step = 0
-        done = False
-
-        while not done:
-            action = self.get_action(net)
-            env_action = np.reshape(action, (-1,2))
-
-            env_action[0] = noise.get_action(env_action[0], step)
-            env_action[0] = env_action[0]*np.array([self.max_v,self.max_w])
-            
-            new_state, reward, done = self.env.step(env_action)
-
-            if store_exp:
-                exp = Experience(self.process_state.process(self.state), action, reward, done, self.process_state.process(new_state))
-                self.replay_buffer.append(exp)
-
-            self.state = new_state
-            episode_reward += reward
-            
-            step += 1
-
-        if store_exp:
-            self.replay_buffer.append(exp)
-            self.replay_buffer.normalize_rewards(gamma)
-
-        return episode_reward
-
-    @torch.no_grad()
-    def play_step(self, net: nn.Module, gamma: float, store_exp: bool = True) -> float:
-        if self.done:
-            self.reset()
-        
-        action_space = 2
-        noise = OUNoise(action_space)
-
-        episode_reward = 0
-        step = 0
-        done = False
-
-        while not done:
-            action = self.get_action(net)
-            env_action = np.reshape(action, (-1,2))
-
-            env_action[0] = noise.get_action(env_action[0], step)
-            env_action[0] = env_action[0]*np.array([self.max_v,self.max_w])
-            
-            new_state, reward, done = self.env.step(env_action)
-
-            if store_exp:
-                exp = Experience(self.process_state.process(self.state), action, reward, done, self.process_state.process(new_state))
-                self.replay_buffer.append(exp)
-
-            self.state = new_state
-            episode_reward += reward
-            
-            step += 1
-
-        if store_exp:
-            self.replay_buffer.append(exp)
-            self.replay_buffer.normalize_rewards(gamma)
-
-        return episode_reward
-    
+     
 class DDPGAgent():
     def __init__(
         self,
@@ -172,8 +75,6 @@ class DDPGAgent():
         max_grad_norm: DictConfig,
         gamma: float,
         tau: float,
-        sync_max_dist_update: int,
-        sync_target_network_update: int,
     ):
 
         self.actor = hydra.utils.instantiate(model_conf.actor).apply(weights_init)
@@ -190,9 +91,6 @@ class DDPGAgent():
         
         self.gamma = gamma
         self.max_grad_norm = max_grad_norm
-
-        self.sync_max_dist_update = sync_max_dist_update
-        self.sync_target_network_update = sync_target_network_update
 
         self.tau = tau
 
@@ -243,6 +141,12 @@ class DDPGAgent():
     def train_networks(self, batch_size):
 
         states, actions, rewards, dones, next_states = self.memory.sample(batch_size)
+        
+        states = states.to(device)
+        actions = actions.to(device)
+        rewards = rewards.to(device)
+        dones = dones.to(device)
+        next_states = next_states.to(device)
 
         # critic
         q_values = self.critic(states, actions)
@@ -253,46 +157,29 @@ class DDPGAgent():
 
         critic_loss = nn.MSELoss()(q_targets, q_values)
         self.critic_opt.zero_grad()
-        self.manual_backward(critic_loss)
+        critic_loss.backward()
         norm_grad_critic = norm_grad(self.critic)
-        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), self.hparams.max_grad_norm.critic)
+        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm.critic)
         self.critic_opt.step()
 
         # actor
         actor_loss = -self.critic(states, self.actor(states)).mean()
         self.actor_opt.zero_grad()
-        self.manual_backward(actor_loss)
+        actor_loss.backward()
         norm_grad_actor = norm_grad(self.actor)
-        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), self.hparams.max_grad_norm.actor)
+        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm.actor)
         self.actor_opt.step()
 
         self.soft_update_target_networks()
 
         output = {
-            'critic_loss': critic_loss.detach().numpy(),
-            'actor_loss': actor_loss.detach().numpy(),
+            'critic_loss': critic_loss.cpu().detach().numpy(),
+            'actor_loss': actor_loss.cpu().detach().numpy(),
             'norm_grad_actor': norm_grad_actor,
             'norm_grad_critic': norm_grad_critic,
         }
 
         return output
-
-    def training_epoch_end(self):
-
-        if not self.current_epoch % self.sync_max_dist_update and not self.current_epoch and self.env.max_dist < 0.75:
-            self.env.max_dist += 0.10
-
-        # val_reward = self.agent.play_episode(self.actor, self.gamma)
-
-        # self.log(
-        #     'val_reward',
-        #     val_reward,
-        #     on_epoch=True,
-        #     prog_bar=False,
-        #     logger=True,
-        # )
-
-        self.step_schedulers()
 
     def soft_update_target_networks(self):
 
@@ -313,7 +200,7 @@ class DDPGAgent():
         
         self.memory.append(exp)
        
-    def step_schedulers(self):
+    def step_schedulers(self, actor_loss, critic_loss):
 
-        self.actor_sch.step()
-        self.critic_sch.step()
+        self.actor_sch.step(actor_loss)
+        self.critic_sch.step(critic_loss)
