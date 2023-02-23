@@ -1,5 +1,0 @@
-defaults:
-  - default
-  
-_target_: src.models.PPOStrategy
-entropy_beta: 0.01

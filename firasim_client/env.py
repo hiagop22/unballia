@@ -92,6 +92,8 @@ def theta():
 
 class MarkovDecisionProcess:
     def __init__(self, 
+                 max_v: float,
+                 max_w: float,
                  max_time_per_episode: int = 60*5,
                  team_color: str = "blue",
                  opponent_color: str = "yellow",
@@ -104,6 +106,9 @@ class MarkovDecisionProcess:
 
         self.min_dist = min_dist
         self.max_dist = max_dist
+
+        self.max_v = max_v
+        self.max_w = max_w
 
         self.num_allies_in_field = num_allies_in_field
         self.num_opponents_in_field = num_opponents_in_field

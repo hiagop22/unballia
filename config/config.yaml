@@ -4,9 +4,7 @@ defaults:
   - scheduler: ReduceLROnPlateau
   - trainer: default
   - model: ddpg
-  - replaybuffer: default
-  - strategy: ddpg
-  - dataset: default
+  - memory: default
   - dataloader: default
   - watch_metric: default
   - agent: ddpg
@@ -14,8 +12,11 @@ defaults:
   - env: FiraSimRewards
 
 action_size: 2
+sync_max_dist_update: 100
+max_epochs: 10000000
+batch_size: 4
 project_name: reinforcement_learning
-task_name: ddpg
+task_name: ddpg_refactored
 is_debug: False
 seed: 747
 logdir: ./outputs

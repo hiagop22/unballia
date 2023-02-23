@@ -138,109 +138,38 @@ class RelativeState:
         
         return processed_state
 
-class ReplayBuffer(object):
-    """Replay buffer for storing past experiences allowing the agent to learn from them."""
+class Memory(object):
     def __init__(self, memory_size: int) -> None:
         super().__init__()
-        self.buffer = []
         self.memory = deque(maxlen=memory_size)
 
     def append(self, experience: Experience) -> None:
-        """Add experience to the buffer
-        
-        Args:
-            experience: tuple (state, action, reward, done, new_state)
-        """
-        self.buffer.append(experience)
-
-    def normalize_rewards(self, gamma: float):
-        # discounted_r = 0
-        # disc_vector = []
-        
-        # for experience in reversed(self.buffer):
-        #     discounted_r = discounted_r * gamma + experience.reward
-        #     disc_vector.append(discounted_r)
-
-        # disc_vector = np.array(disc_vector)
-        # mean = disc_vector.mean()
-        # std = disc_vector.std() + 1e-5
-
-        discounted_r = 0
-        for state, action, reward, done, new_state in reversed(self.buffer):
-            discounted_r = discounted_r * gamma + reward
-            
-            # self.memory.append((state, action, (discounted_r - mean) / std, done, new_state))     
-            self.memory.append((state, action, discounted_r, done, new_state))     
-
-        
-    def getitem(self, idx):
-        return self.memory[idx]
-
-    def reset(self):
-        self.buffer = []
-        # self.memory.clear()
-
-class RLDataset(tdata.Dataset):
-    """Iterable Dataset containing the ExperienceBuffer which will be used with the new experiences
-    during training
-    
-    Args:
-        buffer: replay buffer
-        sample_size: number of experiences to sample at a time
-    """
-
-    def __init__(self, buffer: ReplayBuffer, gamma: float=0.9) -> None:
-        self.buffer = buffer
-        self.gamma = gamma
+        self.memory.append(experience)
 
     def __len__(self):
-        return len(self.buffer.memory)
+        return len(self.memory)
 
-    def __getitem__(self, idx):
-        state, action, reward, done, next_state = self.buffer.getitem(idx)
+    def sample(self, batch_size):
+
+        state_batch = []
+        action_batch = []
+        reward_batch = []
+        done_batch = []
+        next_state_batch = []
+
+        batch = random.sample(self.memory, batch_size)
+        
+        for state, action, reward, done, next_state in batch:
+            state_batch.append(state)
+            action_batch.append(action)
+            reward_batch.append([reward])
+            done_batch.append(done)
+            next_state_batch.append(next_state)
 
         return (
-            torch.from_numpy(np.array(state)).float(),
-            torch.from_numpy(np.array(action)).float(),
-            torch.from_numpy(np.array([reward], dtype=np.float32)).float(),
-            torch.from_numpy(np.array(done, dtype=np.bool)),
-            torch.from_numpy(np.array(next_state)).float(),
+            torch.from_numpy(np.array(state_batch)).float(),
+            torch.from_numpy(np.array(action_batch)).float(),
+            torch.from_numpy(np.array(reward_batch, dtype=np.float32)).float(),
+            torch.from_numpy(np.array(done_batch, dtype=np.bool)),
+            torch.from_numpy(np.array(next_state_batch)).float(),
         )
-
-    def reset(self):
-        self.buffer.reset()
-
-# class DDPGDataset(tdata.Dataset):
-#     """Iterable Dataset containing the ExperienceBuffer which will be used with the new experiences
-#     during training
-    
-#     Args:
-#         buffer: replay buffer
-#         sample_size: number of experiences to sample at a time
-#     """
-
-#     def __init__(self, len: int, buffer: ReplayBuffer, gamma: float=0.9) -> None:
-#         self.buffer = buffer
-#         self.gamma = gamma
-
-#         self.len = len
-
-#     def __len__(self):
-#         return self.len
-#         # return len(self.buffer.memory)
-
-#     def __getitem__(self, idx):
-#         idx = random.randint(0, len(self.buffer.memory))
-
-#         state, action, reward, done, next_state = self.buffer.getitem(idx)
-
-#         return (
-#             torch.from_numpy(np.array(state)).float(),
-#             torch.from_numpy(np.array(action)).float(),
-#             torch.from_numpy(np.array([reward], dtype=np.float32)).float(),
-#             torch.from_numpy(np.array(done, dtype=np.bool)),
-#             torch.from_numpy(np.array(next_state)).float(),
-#         )
-
-#     def reset(self):
-#         self.buffer.reset()
